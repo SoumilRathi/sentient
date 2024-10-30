@@ -3,9 +3,7 @@
 ## Grounding Actions
 These actions involve interacting with external systems and environments. 
 Here are the grounding actions available to you:
-1. reply [MESSAGE] -> Talk to the user / reply to the input. Note that replying to the user is final, and the decision loop will end after this action is selected. 
-            This means that you should only select it once you have finished the task, or when you need more user input to continue the task.
-2. search [QUERY] -> Search the web for information. This will be used to answer questions or retrieve information that is not available in your long term memory.
+{{grounding_actions}}
 
 ## Retrieval Actions
 These actions involve retrieving information from your long term memory. You have three forms of long term memory: episodic, semantic, and procedural.

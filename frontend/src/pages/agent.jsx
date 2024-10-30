@@ -1,10 +1,72 @@
 import { useState } from "react";
 import { Chat } from "../components/chat"
 import "./styles/agent.css"
+import { useEffect } from "react";
+import { io } from "socket.io-client";
 
 
 export const Agent = () => {
     const [selectedActions, setSelectedActions] = useState(['reply']);
+    const [behavior, setBehavior] = useState('');
+    const [socket, setSocket] = useState(null);
+    const [messages, setMessages] = useState([]);
+
+    useEffect(() => {
+        const newSocket = io('http://localhost:7777');
+    
+        newSocket.on('connect', () => {
+            console.log('Connected to server');
+        });
+    
+        newSocket.on('disconnect', () => {
+            console.log('Disconnected from server');
+        });
+    
+        newSocket.on('connect_error', (error) => {
+            console.error('Connection error:', error);
+        });
+
+        newSocket.on('message', (data) => {
+            console.log("Received agent message:", data);  // Debug print to verify
+            setMessages(prev => [...prev, {
+                text: data.message,
+                type: 'agent'
+            }]);
+        });        
+    
+        setSocket(newSocket);
+    
+        return () => {
+            newSocket.close();
+        };
+    }, []);
+
+
+    const startAgent = () => {
+        socket.emit('start', {
+            selectedActions: selectedActions,
+            behavior: behavior
+        });
+        setMessages([]);
+    }
+
+    const handleSendMessage = (message) => {
+        // Add user message to chat
+        setMessages(prev => [...prev, {
+            text: message,
+            type: 'user'
+        }]);
+        
+        // Send message to server
+        socket.emit('message', { 
+            message: message,
+        });
+    }
+
+    const resetAgent = () => {
+        socket.emit('reset');
+        setMessages([]);
+    }
 
     const handleActionChange = (action) => {
         if (action === 'reply') {
@@ -40,31 +102,41 @@ export const Agent = () => {
                         <div className="action">
                             <input 
                                 type="checkbox" 
-                                id="websearch"
-                                checked={selectedActions.includes('websearch')}
-                                onChange={() => handleActionChange('websearch')}
+                                id="search"
+                                checked={selectedActions.includes('search')}
+                                onChange={() => handleActionChange('search')}
                             />
-                            <label htmlFor="websearch">Websearch</label>
+                            <label htmlFor="search">Search</label>
                         </div>
                         <div className="action">
                             <input 
                                 type="checkbox" 
-                                id="browser"
-                                checked={selectedActions.includes('browser')}
-                                onChange={() => handleActionChange('browser')}
+                                id="browse"
+                                checked={selectedActions.includes('browse')}
+                                onChange={() => handleActionChange('browse')}
                             />
-                            <label htmlFor="browser">Use browser</label>
+                            <label htmlFor="browse">Browse</label>
                         </div>
                     </div>
                 </div>
                 <div className='config_item behavior'>
                     <h1 className="config_item_title behavior_title">Behavior</h1>
 
-                    <textarea className="config_item_content behavior_area" />
+                    <textarea 
+                        className="config_item_content behavior_area" 
+                        value={behavior}
+                        onChange={(e) => setBehavior(e.target.value)}
+                    />
+                </div>
+
+                <div className="start_agent_container">
+                    <button className="start_agent" onClick={startAgent}>
+                        Start Agent
+                    </button>
                 </div>
             </div>
             <div className="chat">
-                <Chat />
+                <Chat messages={messages} setMessages={setMessages} socket={socket} onMessage={handleSendMessage} />
             </div>
         </div>
     )

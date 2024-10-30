@@ -4,41 +4,9 @@ import * as FaIcons from "react-icons/fa";
 import { FiRefreshCcw } from "react-icons/fi";
 import "./styles/chat.css";
 
-export const Chat = () => {
-    const [messages, setMessages] = useState([]);
+export const Chat = ({messages, setMessages, socket, setSocket, onMessage}) => {
     const [inputMessage, setInputMessage] = useState("");
-    const [socket, setSocket] = useState(null);
     const messagesContainerRef = useRef(null);
-
-    useEffect(() => {
-        const newSocket = io('http://localhost:7777');
-    
-        newSocket.on('connect', () => {
-            console.log('Connected to server');
-        });
-    
-        newSocket.on('disconnect', () => {
-            console.log('Disconnected from server');
-        });
-    
-        newSocket.on('connect_error', (error) => {
-            console.error('Connection error:', error);
-        });
-
-        newSocket.on('message', (data) => {
-            console.log("Received agent message:", data);  // Debug print to verify
-            setMessages(prev => [...prev, {
-                text: data.message,
-                type: 'agent'
-            }]);
-        });        
-    
-        setSocket(newSocket);
-    
-        return () => {
-            newSocket.close();
-        };
-    }, []);
     
 
     useEffect(() => {
@@ -51,17 +19,7 @@ export const Chat = () => {
         if (inputMessage.trim() !== "" && socket) {
             const newMessage = inputMessage.trim();
             
-            // Add user message to chat
-            setMessages(prev => [...prev, {
-                text: newMessage,
-                type: 'user'
-            }]);
-            
-            // Send message to server
-            socket.emit('user_message', { message: newMessage });
-            
-            // Clear input
-            setInputMessage("");
+            onMessage(newMessage);
         }
     };
 
@@ -72,7 +30,8 @@ export const Chat = () => {
 
     const handleKeyPress = (e) => {
         if (e.key === "Enter") {
-            sendMessage();
+            sendMessage(inputMessage);
+            setInputMessage("");
         }
     };
 

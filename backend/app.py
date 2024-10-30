@@ -54,7 +54,14 @@ def handle_connect():
 def handle_disconnect():
     print('Client disconnected')
 
-@socketio.on('user_message')
+
+@socketio.on('start')
+def handle_start(data):
+    selectedActions = data.get('selectedActions')
+    behavior = data.get('behavior')
+    agent.start(selectedActions, behavior)
+
+@socketio.on('message')
 def handle_message(data):
     message = data.get('message')
     if message:
@@ -66,10 +73,7 @@ def handle_message(data):
 
 @socketio.on('reset')
 def handle_reset():
-    print("Reset received from client.")  # Debugging print statement
-    agent.reset()  # Ensure that agent.reset() is valid and works without issues
-    print("Agent reset.")
-
+    agent.reset()
 
 # Run the chat agent
 if __name__ == "__main__":

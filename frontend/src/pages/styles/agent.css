@@ -16,7 +16,7 @@
 }
 
 .config_item {
-    height: 50%;
+    height: 30%;
     width: 100%;
     padding: 1rem;
     box-sizing: border-box;
@@ -24,9 +24,7 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
-}
 
-.config_item:first-of-type {
     border-bottom: 1px solid lightgray;
 }
 
@@ -49,4 +47,29 @@
     padding: 1rem;
     font-size: 1rem;
     font-family: 'Inter', sans-serif;
+}
+
+.start_agent_container {
+    padding: 0rem 1rem;  
+    box-sizing: border-box;
+}
+
+.start_agent {
+    border: 1px solid lightgray;
+    height: 2.5rem;
+    width: 10rem;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    box-sizing: border-box;
+    font-size: 1rem;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: all 0.3s ease;
+}
+
+.start_agent:hover {
+    background-color: lightgray;
 }
