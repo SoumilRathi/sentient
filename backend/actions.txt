@@ -1,0 +1,30 @@
+# Actions
+
+## Grounding Actions
+These actions involve interacting with external systems and environments. 
+Here are the grounding actions available to you:
+1. reply [MESSAGE] -> Talk to the user / reply to the input. Note that replying to the user is final, and the decision loop will end after this action is selected. 
+            This means that you should only select it once you have finished the task, or when you need more user input to continue the task.
+2. search [QUERY] -> Search the web for information. This will be used to answer questions or retrieve information that is not available in your long term memory.
+
+## Retrieval Actions
+These actions involve retrieving information from your long term memory. You have three forms of long term memory: episodic, semantic, and procedural.
+Episodic memory contains memories of past events and experiences.
+Semantic memory contains general knowledge about the world.
+Procedural memory contains rules and procedures for how to do things, such as reasoning or learning. 
+Here are the retrieval actions available to you:
+1. retreive episodic "DATE" -> Retrieve all episodic memories from a specific date. Note that the date you select should be in MM/DD/YYYY format.
+2. retrieve semantic "TOPIC" -> Retrieve all semantic memories related to a specific topic. Note that the topic you select will be used to conduct semantic search and retrieve relevant memories.
+
+## Reasoning Actions
+These actions involve reasoning and determining more knowledge within the working memory regarding the current task. 
+These actions take information that is currently in your working memory and generate new knowledge and information based on that
+These will help you gain a better understanding of the task, and help you make better decisions.
+Here are the reasoning actions available to you:
+1. reason "FOCUS" -> Reason using the current working memory with the focus on a specific topic. Please note that reasoning is entirely based on the current working memory, and cannot use/introduce any external knowledge. Try to use this when there is some knowledge in the working memory that you can use to reason further.
+
+## Learning Actions
+These actions involve learning new information and updating your long term memory.
+Here are the learning actions available to you:
+1. learn episodic "MEMORY" -> Learn a new episodic memory. This should be used when you have a memory that you wish to add to your long term storage of experiences. Limit these to memories that you believe will be important to your future decisions.
+2. learn semantic "MEMORY" -> Learn a new semantic memory. This should be used when you have a memory that you wish to add to your long term understanding of the world. These should be memories that you did not have before, and are actual solid pieces of information that you have now acquired within your working memory. Before deciding to add anything to semantic memory, ensure that the sentence/memory you add is new knowledge that you have obtained, that will be useful for you in the future. Otherwise, you are effectively wasting an action. Please do not that if you do in fact manage to obtain new knowledge, it should be your first priority to add it to memory, since more knowledge is always better.

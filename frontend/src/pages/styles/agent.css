@@ -1,0 +1,52 @@
+.website_container {
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+}
+
+.config {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    height: 100%;
+
+}
+
+.config_item {
+    height: 50%;
+    width: 100%;
+    padding: 1rem;
+    box-sizing: border-box;
+
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.config_item:first-of-type {
+    border-bottom: 1px solid lightgray;
+}
+
+
+
+.config_item_title {
+    height: 10%;
+}
+
+.config_item_content {
+    height: 90%;
+}
+
+
+.behavior_area {
+    border: 1px solid lightgray;
+    outline: none;
+    resize: none;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    font-size: 1rem;
+    font-family: 'Inter', sans-serif;
+}
