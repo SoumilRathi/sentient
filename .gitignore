@@ -1,0 +1,27 @@
+.DS_STORE
+
+backend/__pycache__
+backend/.venv
+backend/google_service_credentials.json
+frontend/node_modules
+
+
+# .gitignore
+
+# Environment variables
+frontend/.env
+backend/.env
+
+# Python
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
