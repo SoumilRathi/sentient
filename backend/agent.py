@@ -19,6 +19,7 @@ client = OpenAI(api_key='sk-proj-le0HHaN0FR4QvD9RUScsW3H0EghId9ICE-lOCEW1RezbhA8
 class Agent:
     def __init__(self):
         """Initialize the agent with working and long-term memory and OpenAI API key"""
+        print("Agent initialized")
         self.reply_callback = None 
         self.working_memory = WorkingMemory()
         self.long_term_memory = LongTermMemory()
@@ -26,7 +27,7 @@ class Agent:
         # self.actions_instructions = self.load_actions_from_file("actions.txt")
         self.decision_loop_running = False
         self.decision_thread = None
-        self.selected_actions = []
+        self.selected_actions = ["reply"]
         self.behavior = ""
 
     def start(self, selected_actions, behavior):
@@ -35,6 +36,11 @@ class Agent:
         self.selected_actions = selected_actions
         self.behavior = behavior
 
+    
+    def browse_web(self):
+        """Browses the web"""
+        pass
+    
     def web_search(self, query):
         """Conducts a web search using Google Custom Search API, scrapes the top results, and returns the extracted content"""
         search_url = f"https://www.googleapis.com/customsearch/v1"
@@ -45,6 +51,7 @@ class Agent:
         }
         
         response = requests.get(search_url, params=params)
+        search_output = "";
         if response.status_code == 200:
             search_results = response.json()
 
@@ -60,17 +67,25 @@ class Agent:
                 except Exception as e:
                     print(f"Failed to scrape {link}: {str(e)}")
 
-            # Add the extracted content to working memory
-            for content in extracted_content:
-                self.working_memory.store_knowledge(content)
-
             search_output = "\n".join(extracted_content)
             print(f"Extracted content from {len(extracted_content)} webpages")
-            return search_output
 
         else:
             print(f"Failed to retrieve search results, status code: {response.status_code}")
             return f"Failed to retrieve search results, status code: {response.status_code}"
+
+
+        if (search_output == ""):
+            self.working_memory.store_observation("Web search returned no results.")
+            return;
+
+        print("ALL SEARCH OUTPUT: ", search_output)
+
+        # process the search output into segments and add it to knowledge
+        self.working_memory.text_to_knowledge(search_output)
+        return;
+
+
 
     def scrape_webpage(self, url):
         """Scrapes the content of a webpage"""
@@ -96,12 +111,8 @@ class Agent:
         chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
         # Drop blank lines
         text = '\n'.join(chunk for chunk in chunks if chunk)
-
-        print("SCRAPED CONTENT: ", text)
-
-        
         # Limit the text to a reasonable length (e.g., first 1000 characters)
-        return text[:1000]
+        return text
 
     
     def load_actions_from_file(self, filename):
@@ -168,7 +179,6 @@ class Agent:
 
         """
 
-
         response = use_claude(prompt)
 
         print("PROPOSED ACTIONS + THOUGHT PROCESS: ", response)
@@ -197,10 +207,8 @@ class Agent:
                 self.reply_callback(action[6:], self.client_sid)
             isFinal = True
         elif action_name == "search":
-            print("SEARCHING", action)
             query = action[7:].strip('"')  # Extract search query 
-            search_results = self.web_search(query)
-            self.working_memory.store_knowledge(f"Search results for '{query}': {search_results}")
+            self.web_search(query)
             print(f"Search completed for query: {query}")
         elif action_name == "retrieve":
             print("RETRIEVING MEMORY", action)

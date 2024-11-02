@@ -17,6 +17,11 @@ grounding_actions = [
         "name": "browse",
         "description": "Browse the web for information. This will be used if you want to take any action that requires you to use the browser",
         "action": "browse [INTENTION]"
+    },
+    {
+        "name": "email",
+        "description": "Send an email to a specified email address. This will be used if you need to send an email to a user. Please do not use this unless you have specifically been asked to send an email.",
+        "action": "email [EMAIL_ADDRESS] [SUBJECT] [BODY]"
     }
 ]
 
@@ -35,8 +40,6 @@ def get_available_actions(selected_actions):
     
     # Replace the placeholder in the actions instructions
     actions_text = actions_instructions.replace("{{grounding_actions}}", grounding_actions_str)
-
-    print(actions_text)
     
     return actions_text
 
@@ -99,3 +102,7 @@ def use_claude(user_prompt, system_prompt=None, temperature=1, json=False, tools
     message = client.messages.create(**message_params)
 
     return message.content[0].text
+
+
+def send_email(email_address, subject, body):
+    pass;

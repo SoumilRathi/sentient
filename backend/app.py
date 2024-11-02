@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, make_response
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 from agent import Agent
+from memory.lt_memory import LongTermMemory
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -81,5 +82,10 @@ if __name__ == "__main__":
     print("Agent is ready. Starting Flask server...")
     agent.reply_callback = agent_reply_handler
     print("Agent is ready. Starting SocketIO server...")
-    agent.long_term_memory.store_memory("semantic", "Taco Bell is the best mexican restaurant in Champaign")
+    # agent.long_term_memory.store_memory("semantic", "Taco Bell is the best mexican restaurant in Champaign")
     socketio.run(app, debug=True, port=7777)
+
+
+    # lt_memory = LongTermMemory();
+
+    # print(lt_memory.retrieve_memory("Hey my name is Soumil"));
