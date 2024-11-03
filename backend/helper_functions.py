@@ -9,7 +9,7 @@ load_dotenv()
 grounding_actions = [
     {
         "name": "reply",
-        "description": "Talk to the user / reply to the input. Note that replying to the user is final, and the decision loop will end after this action is selected. This means that you should only select it once you have finished the task, or when you need more user input to continue the task. Please note that the reply message should be in markdown format.",
+        "description": "Talk to the user / reply to the input. Note that replying to the user is final, and the decision loop will end after this action is selected. This means that you should only select it once you have finished the task, or when you need more user input to continue the task. Please note that the reply message should be in markdown format. If you want to give control of the conversation back to the user (basically if you want to wait to continue the task until the user sends another message), just add the tag <wait> to the end of your reply.",
         "action": "reply <MESSAGE>"
     },
     {
@@ -24,7 +24,7 @@ grounding_actions = [
     },
     {
         "name": "email",
-        "description": "Send an email to a specified email address. This will be used if you need to send an email to a user. Please do not use this unless you have specifically been asked to send an email. Please note that the body of the email should be in html format.",
+        "description": "Send an email to a specified email address. This will be used if you need to send an email to a user. Please do not use this unless you have specifically been asked to send an email. Please note that the body of the email should be in html format. Ensure that the body is always in html format, as it will present an error otherwise.",
         "action": 'email "<EMAIL_ADDRESS>" "<SUBJECT>" """<BODY>"""'
     }
 ]

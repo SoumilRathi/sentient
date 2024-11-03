@@ -13,6 +13,10 @@ from dotenv import load_dotenv
 from scrapy.crawler import CrawlerProcess
 from scrapy import Spider, Request
 from scrapingbee import ScrapingBeeClient
+from datetime import datetime
+import asyncio
+from typing import Dict, List
+import time
 
 # Load environment variables from .env file
 load_dotenv()
@@ -20,6 +24,7 @@ load_dotenv()
 scrapingbee_client = ScrapingBeeClient(api_key=os.getenv("SCRAPINGBEE_API_KEY"))
 
 class Agent:
+
     def __init__(self):
         """Initialize the agent with working and long-term memory and OpenAI API key"""
         print("Agent initialized")
@@ -32,6 +37,15 @@ class Agent:
         self.decision_thread = None
         self.selected_actions = ["reply"]
         self.behavior = ""
+        self.reminders: Dict[datetime, List[dict]] = {}
+
+        self.reminder_thread = None
+        self.reminder_thread_lock = threading.Lock()
+        # Only start reminder thread if it's not already running
+        with self.reminder_thread_lock:
+            if self.reminder_thread is None or not self.reminder_thread.is_alive():
+                self.reminder_thread = threading.Thread(target=self._check_reminders, daemon=True)
+                self.reminder_thread.start()
 
     def start(self, selected_actions, behavior):
         """Start the agent"""
@@ -156,6 +170,9 @@ class Agent:
         3. Consider how to provide the best eventual output based on the given input.
         4. Choose actions that will help you reach that output.
         5. When you have to enter or use explicit variables, identify if you have the required variable in your working memory. If you do, use it. If not, identify the best way to get the value you need. This could be asking the user, searching the web, or more. Determine this based on the variable at hand.
+        6. If there is any task that has a reminder or a specific time associated with it, don't conduct the action now. Instead, set a reminder for the specified time, which will be added to your working memory when the reminder is triggered.
+        7. Please note that if you notice a reminder for a task within your previous actions within your working memory, you should ignore that, since that's a reminder for the future. Any reminders that you actually have to act on will be present within your observations with the prefix "REMINDER:"
+        8. If acting on a reminder within your observations, please first check if an action corresponding to that reminder has already been taken. If so, that reminder is no longer relevant and can be ignored.
 
         Available actions:
         {get_available_actions(self.selected_actions)}
@@ -169,6 +186,7 @@ class Agent:
         3. How relevant and priority is this action given the current context?
         - Which actions are most likely to lead to a productive outcome?
         - Are there any actions that might be redundant or less useful given the current context?
+        4. Is there any action that requires other actions to be completed first? If so, give higher priority to the actions to be completed first.
 
         After your analysis, provide your final chosen actions in a JSON format. Here's an example of the expected output structure (note that this is just a format example, not a suggestion for actual actions):
 
@@ -219,18 +237,21 @@ class Agent:
         
     
     def execute_action(self, action):
-        """Executes the selected action. This will simply do whatever the action is supposed to do, and then store the action in the working memory"""
-
+        """Executes the selected action"""
         isFinal = False
         # get the first word of the action
         action_name = action.split()[0]
 
         if action_name == "reply":
+            reply_message = action[6:]
+            if "<wait>" in reply_message:
+                reply_message = reply_message.replace("<wait>", "")
+                isFinal = True
             if self.reply_callback:
-                self.reply_callback(action[6:], self.client_sid)
+                self.reply_callback(reply_message, self.client_sid)
             self.working_memory.store_conversation_history({
                 "from": "agent",
-                "message": action[6:]
+                "message": reply_message
             })
         elif action_name == "search":
             query = action[7:].strip('"')  # Extract search query 
@@ -239,15 +260,33 @@ class Agent:
         elif action_name == "email":
             print(f"Sending email: {action[7:]}")
             # Extract email, subject and body from the action string
-            email_match = re.search(r'"([^"]+)"\s+"([^"]+)"\s+"""([\s\S]+?)"""', action[6:])
-            if email_match:
-                email_address = email_match.group(1)
-                subject = email_match.group(2)
-                body = email_match.group(3)
-                send_email(email_address, subject, body)
-                print(f"Sending email to: {email_address}")
-                print(f"Subject: {subject}") 
-                print(f"Body: {body}")
+            email_content = action[6:].strip()
+            
+            # Find first quote-wrapped section (email)
+            first_quote_start = email_content.find('"') + 1
+            first_quote_end = email_content.find('"', first_quote_start)
+            email_address = email_content[first_quote_start:first_quote_end]
+            
+            # Find second quote-wrapped section (subject)
+            second_quote_start = email_content.find('"', first_quote_end + 1) + 1
+            second_quote_end = email_content.find('"', second_quote_start)
+            subject = email_content[second_quote_start:second_quote_end]
+            
+            # Find body section (either triple or double quoted)
+            remaining = email_content[second_quote_end + 1:].strip()
+            if remaining.startswith('"""'):
+                body_start = remaining.find('"""') + 3
+                body_end = remaining.find('"""', body_start)
+                body = remaining[body_start:body_end]
+            else:
+                body_start = remaining.find('"') + 1
+                body_end = remaining.find('"', body_start)
+                body = remaining[body_start:body_end]
+            
+            send_email(email_address, subject, body)
+            print(f"Sending email to: {email_address}")
+            print(f"Subject: {subject}")
+            print(f"Body: {body}")
         elif action_name == "reason":
             print(f"Reasoning: {action[7:]}")
             self.working_memory.reason(action[7:])
@@ -266,6 +305,15 @@ class Agent:
             except Exception as e:
                 print("lmao no finish callback")
             isFinal = True
+
+        elif action_name == "remind":
+            # Extract time and task from the remind action
+            # Format: remind <TIME> "<TASK>"
+            parts = action[7:].split(' "', 1)
+            if len(parts) == 2:
+                time_str = parts[0].strip()
+                task = parts[1].strip('"')
+                self.set_reminder(time_str, task)
 
         print(f"Executing action: {action}")
 
@@ -321,30 +369,61 @@ class Agent:
         self.long_term_memory = LongTermMemory()
 
 
-    def scrapetest(self):
-        print("SCRAPING TEST")
-        url = "https://www.tripadvisor.com/Restaurants-g3511549-Champaign_Urbana_Illinois.html"        
-        response = scrapingbee_client.get(url, params = {
-            'ai_query': 'top restaurants Champaign Urbana',
-            'premium_proxy': True,
-            'country_code': 'us',
-        })
-        try:
-            print(response)
-        except Exception as e:
-            print(f"Error printing response: {e}")
+    
+
+    def _check_reminders(self):
+        """Background thread that checks for due reminders"""
+        while True:
+            current_time = datetime.now()
+            reminders_to_process = []
+
+            print("CURRENT TIME: ", current_time)
+            print("REMINDERS: ", self.reminders)
             
-        try:
-            print(response.body)
-        except Exception as e:
-            print(f"Error printing response body: {e}")
+            # Create a copy of reminder times to avoid modification during iteration
+            reminder_times = list(self.reminders.keys())
             
-        try:
-            print(response.content)
-        except Exception as e:
-            print(f"Error printing response content: {e}")
+            # Check for due reminders
+            for reminder_time in reminder_times:
+                print("REMINDER TIME: ", reminder_time)
+                if current_time >= reminder_time:
+                    reminders_to_process.extend(self.reminders[reminder_time])
+                    del self.reminders[reminder_time]
             
+            # Process due reminders
+            for reminder in reminders_to_process:
+                print("PROCESSING REMINDER: ", reminder)
+                self.process_reminder(reminder)
+            
+            # Sleep for a short interval before next check
+            time.sleep(60)  # Check every minute
+    def process_reminder(self, reminder):
+        """Process a due reminder"""
+        # Add reminder context to working memory
+        self.working_memory.store_observation(f"REMINDER: {reminder['message']}")
+        
+        # Start decision loop if not already running
+        if not self.decision_loop_running:
+            self.decision_thread = threading.Thread(target=self.make_decision)
+            self.decision_thread.start()
+    
+    def set_reminder(self, time_str: str, message: str):
+        """Set a reminder for a specific time"""
+
+        print("Sets a reminder for: ", time_str)
         try:
-            print(response.content.decode('utf-8'))
-        except Exception as e:
-            print(f"Error decoding response content: {e}")
+            reminder_time = datetime.fromisoformat(time_str)
+            if reminder_time not in self.reminders:
+                self.reminders[reminder_time] = []
+            
+            self.reminders[reminder_time].append({
+                'message': message,
+                'set_at': datetime.now()
+            })
+            
+            print("Reminder set for: ", reminder_time)
+            print("Reminders now: ", self.reminders)
+            return True
+        except ValueError:
+            print(f"Invalid datetime format: {time_str}")
+            return False

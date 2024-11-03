@@ -83,7 +83,7 @@ if __name__ == "__main__":
     agent.reply_callback = agent_reply_handler
     print("Agent is ready. Starting SocketIO server...")
     # agent.long_term_memory.store_memory("semantic", "Taco Bell is the best mexican restaurant in Champaign")
-    socketio.run(app, debug=True, port=7777)
+    socketio.run(app, port=7777)
    
     # lt_memory = LongTermMemory();
 

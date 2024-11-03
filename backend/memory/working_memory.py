@@ -5,7 +5,8 @@ Think of the knowledge within the working memory as a map of knowledge that the 
 and the strings of sentences are just the bits of knowledge about that idea themselves.
 """
 
-
+import threading
+import time
 import datetime
 from sentence_transformers import SentenceTransformer
 from numpy import dot
@@ -19,6 +20,9 @@ model = SentenceTransformer('all-mpnet-base-v2')
 class WorkingMemory:
     def __init__(self):
         """Initialize working memory with different categories"""
+        self.basic_information = {
+            "datetime": datetime.datetime.now().isoformat()
+        }
         self.observations = []  # History of observations and final outputs
         self.actions = []  # History of actions taken
         self.knowledge = {}
@@ -27,7 +31,16 @@ class WorkingMemory:
         # if the agent is trying to find a restaurant, the variables could be the type of food, the price range, the location, etc.
         # if the agent is trying to send an email, the variables would be the email address.
         self.conversation_history = []
-    
+        
+        # Start a background thread to update datetime every minute
+        self.update_thread = threading.Thread(target=self._update_datetime, daemon=True)
+        self.update_thread.start()
+        
+    def _update_datetime(self):
+        """Update datetime every minute in a background thread"""
+        while True:
+            self.basic_information["datetime"] = datetime.datetime.now().isoformat()
+            time.sleep(60)  # Sleep for 60 seconds
     def store_observation(self, observation):
         """Store an observation or final output"""
         self.observations.append(observation)
@@ -239,7 +252,7 @@ class WorkingMemory:
 
         prompt = f"""
 
-        You are an advanced AI specialized in information extraction and organization. Your task is to analyze a given text, which is typically a conversation history, and identify distinct user-entered variables regarding any personal information that you need to remember along with their values. Your goal is to segment the conversation and extract important variables that the user may have provided during the interaction.
+        You are an advanced AI assistant specializing in information extraction and organization. Your task is to analyze a given text, typically a conversation history, and identify distinct user-specific variables along with their values. These variables should relate to personal information that needs to be remembered for future interactions.
 
         Here is the text you need to analyze:
 
@@ -249,48 +262,67 @@ class WorkingMemory:
 
         Please follow these steps to complete the task:
 
-        1. Carefully read through the entire text.
-        2. In <variable_extraction> tags:
-        a. As you read through the text, write down each potential variable you encounter, along with its value and the surrounding context. Number each variable.
-        b. Categorize each variable (e.g., personal information, preferences, numerical data).
-        c. After your initial pass, scan the text again to check for any missed variables, especially short names like "email_address".
-        d. Compile a final list of variables and their values based on your analysis.
-        3. Ensure that the variables you extract are relevant to the user's personal information, and not just any random variables.
-        4. Convert the list into a JSON object with variable names as keys and their values as values.
-        5. Return the JSON object.
+        1. Carefully read through the entire input text.
 
-        Your variable extraction should look something like this:
-        <variable_extraction>
+        2. Conduct an analysis of the text, focusing on identifying user-specific variables. Wrap your analysis inside <analysis> tags. In your analysis:
+        a. List all names mentioned in the text.
+        b. Identify potential variables related to the user's personal information.
+        c. For each potential variable, note its value, the surrounding context, and its frequency in the text.
+        d. Categorize each variable (e.g., personal information, preferences, numerical data).
+        e. Cross-reference identified variables with common personal information categories (e.g., name, age, location, occupation).
+        f. Evaluate the relevance and consistency of each variable to the user's personal information.
+        g. Perform a second pass to check for any missed variables, especially short names or nicknames.
+        h. Compile a final list of relevant user-specific variables and their values.
+
+        3. Convert the final list into a JSON object, with variable names as keys and their values as values.
+
+        4. Return the JSON object.
+
+        Your analysis should follow this structure:
+
+        <analysis>
+        Names mentioned in the text:
+        [List all names]
+
         1. Potential variable: [variable name]
         Value: [corresponding value]
         Category: [category of the variable]
         Context: [surrounding text or reasoning for identification]
+        Frequency: [how often the variable appears in the text]
+        Relevance: [explanation of why this is relevant user-specific information]
+        Consistency: [note if the value is consistent throughout the text]
 
         2. Potential variable: [another variable name]
         Value: [corresponding value]
         Category: [category of the variable]
         Context: [surrounding text or reasoning for identification]
+        Frequency: [how often the variable appears in the text]
+        Relevance: [explanation of why this is relevant user-specific information]
+        Consistency: [note if the value is consistent throughout the text]
 
         [Continue for all identified variables]
 
-        Second pass for missed variables:
-        [List any additional variables found]
+        Cross-reference with common personal information categories:
+        [List how identified variables match with common categories]
 
-        Final list of variables and values:
+        Second pass for missed variables:
+        [List any additional variables found, following the same structure]
+
+        Final list of relevant user-specific variables and values:
         - [variable1]: [value1]
         - [variable2]: [value2]
         [etc.]
-        </variable_extraction>
+        </analysis>
 
-        Your final output must strictly adhere to the following JSON format:
+        After completing your analysis, provide the final output in the following JSON format:
 
         {{
-        "variable_name_1": "variable_value_1",
-        "variable_name_2": "variable_value_2"
+        "variable1": "value1",
+        "variable2": "value2",
+        ...
         }}
 
-        Remember to include all identified variables, even if they are short names like "email_address". Ensure that your JSON is properly formatted and that all variable names and values are correctly extracted from the input text.
-
+        Remember, only include variables that are specifically related to the user's personal information and are important for future interactions. Do not include random or irrelevant variables.
         """
 
         print("PROMPT: ",prompt)
@@ -366,7 +398,11 @@ class WorkingMemory:
 
     def print(self): 
         """Return a formatted string of the contents of working memory"""
-        return f"""## Observations
+        return f"""
+        ## Basic Information
+        {"\n".join([f"### {key}\n{value}" for key, value in self.basic_information.items()]) if self.basic_information else "No basic information recorded yet."}
+        
+        ## Observations
         {self.observations if self.observations else "No observations recorded yet."}
         
         ## Actions Taken
