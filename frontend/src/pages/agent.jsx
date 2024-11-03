@@ -5,11 +5,12 @@ import { FiRefreshCcw } from "react-icons/fi";
 import { IoClose } from "react-icons/io5";
 import "./styles/agent.css"
 
-export const Agent = () => {
+export const Agent = ({ selectedActions, behaviorText }) => {
     const [socket, setSocket] = useState(null);
     const [messages, setMessages] = useState([]);
     const [inputMessage, setInputMessage] = useState("");
     const [attachedImages, setAttachedImages] = useState([]);
+    const [isWaiting, setIsWaiting] = useState(false);
     const messagesContainerRef = useRef(null);
     const fileInputRef = useRef(null);
 
@@ -29,6 +30,7 @@ export const Agent = () => {
         });
 
         newSocket.on('message', (data) => {
+            setIsWaiting(false);
             setMessages(prev => [...prev, {
                 text: data.message,
                 type: 'agent'
@@ -46,7 +48,7 @@ export const Agent = () => {
         if (messagesContainerRef.current) {
             messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
         }
-    }, [messages]);
+    }, [messages, isWaiting]);
 
     const handleFileUpload = (event) => {
         const files = Array.from(event.target.files);
@@ -85,6 +87,7 @@ export const Agent = () => {
 
             // Add to local messages
             setMessages(prev => [...prev, newMessage]);
+            setIsWaiting(true);
             
             // Send via socket
             socket.emit('user_message', newMessage);
@@ -98,6 +101,7 @@ export const Agent = () => {
     const resetMessages = () => {
         socket.emit('reset');
         setMessages([]);
+        setIsWaiting(false);
     }
 
     const handleKeyPress = (e) => {
@@ -133,6 +137,11 @@ export const Agent = () => {
                             </div>
                         </div>
                     ))}
+                    {isWaiting && (
+                        <div className="working-message">
+                            Working...
+                        </div>
+                    )}
                 </div>
 
                 <div className="chat_input_holder">
