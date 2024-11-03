@@ -42,7 +42,6 @@ export const Agent = ({ selectedActions, behaviorText }) => {
         });
 
         deepgramSocketRef.current = deepgramSocket;
-        console.log("DEEPGRAM SOCKET: ", deepgramSocketRef.current);
         let isDeepgramOpen = false;
 
         if (keepAliveRef.current) clearInterval(keepAliveRef.current);
@@ -243,7 +242,7 @@ export const Agent = ({ selectedActions, behaviorText }) => {
                     {messages.map((message, index) => (
                         <div key={index} className={`chat_message ${message.type === 'agent' ? 'received' : 'sent'}`}>
                             <div className="message">
-                                {message.text?.replace(/^'|'$/g, '')}
+                                {message.text?.trim().replace(/^['"]|['"]$/g, '')}
                                 {message.images && message.images.length > 0 && (
                                     <div className="images_preview">
                                         {message.images.map((image, imgIndex) => (

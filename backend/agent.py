@@ -17,6 +17,7 @@ from datetime import datetime
 import asyncio
 from typing import Dict, List
 import time
+from helper.code_execution import generate_and_execute
 
 # Load environment variables from .env file
 load_dotenv()
@@ -315,6 +316,11 @@ class Agent:
                 time_str = parts[0].strip()
                 task = parts[1].strip('"')
                 self.set_reminder(time_str, task)
+        elif action_name == "code":
+            task = action[5:].strip()
+            print(f"Writing code: {task}")
+            result = generate_and_execute(task)
+            self.working_memory.store_observation("Task to write code: " + task + "\n" + "Result: " + result)
 
         print(f"Executing action: {action}")
 

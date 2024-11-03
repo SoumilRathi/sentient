@@ -75,6 +75,12 @@ export const Sidebar = ({ selectedActions, setSelectedActions, behaviorText, set
                                 >
                                     <FaIcons.FaSearch />
                                 </div>
+                                <div 
+                                    className={`action_item ${selectedActions.includes('code') ? 'selected' : ''}`}
+                                    onClick={() => toggleAction('code')}
+                                >
+                                    <FaIcons.FaCode />
+                                </div>
                             </div>
 
                             <div className='settings_section behavior_section'>

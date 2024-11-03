@@ -5,7 +5,7 @@ import { useState } from 'react';
 
 export const Router = () => {
 
-    const [selectedActions, setSelectedActions] = useState(['reply', 'email', 'search']);
+    const [selectedActions, setSelectedActions] = useState(['reply', 'email', 'search', 'code']);
     const [behaviorText, setBehaviorText] = useState('');
 
     return (
