@@ -4,6 +4,8 @@ import * as FaIcons from "react-icons/fa";
 import { FiRefreshCcw } from "react-icons/fi";
 import { IoClose } from "react-icons/io5";
 import "./styles/agent.css"
+import { LiveTranscriptionEvents, createClient } from "@deepgram/sdk";
+
 
 export const Agent = ({ selectedActions, behaviorText }) => {
     const [socket, setSocket] = useState(null);
@@ -11,8 +13,125 @@ export const Agent = ({ selectedActions, behaviorText }) => {
     const [inputMessage, setInputMessage] = useState("");
     const [attachedImages, setAttachedImages] = useState([]);
     const [isWaiting, setIsWaiting] = useState(false);
+    const [isRecording, setIsRecording] = useState(false);
     const messagesContainerRef = useRef(null);
     const fileInputRef = useRef(null);
+    const deepgramSocketRef = useRef(null);
+    const keepAliveRef = useRef(null);
+    const messageBufferRef = useRef([]);
+
+    let deepgramClient;
+    const deepgramKey = import.meta.env.VITE_DEEPGRAM_KEY;
+    deepgramClient = createClient(deepgramKey, {
+        global: { fetch: { options: { proxy: { url: "http://localhost:5174" } } } },
+    });
+    const setupDeepgram = () => {
+        let full_speech = "";
+        let transcriptTimeout;
+        const timeoutDuration = 2500;
+
+        const deepgramSocket = deepgramClient.listen.live({
+            language: "en",
+            punctuate: true,
+            smart_format: true,
+            model: "nova-2",
+            interim_results: true,
+            utterance_end_ms: "1000",
+            vad_events: true,
+            endpointing: 300
+        });
+
+        deepgramSocketRef.current = deepgramSocket;
+        console.log("DEEPGRAM SOCKET: ", deepgramSocketRef.current);
+        let isDeepgramOpen = false;
+
+        if (keepAliveRef.current) clearInterval(keepAliveRef.current);
+        keepAliveRef.current = setInterval(() => {
+            deepgramSocket.keepAlive();
+        }, 8000);
+
+        const resetTranscriptTimeout = () => {
+            clearTimeout(transcriptTimeout);
+            transcriptTimeout = setTimeout(() => {
+                if (full_speech.length > 0) {
+                    setInputMessage(prev => prev + full_speech);
+                    full_speech = "";
+                }
+            }, timeoutDuration);
+        };
+
+        deepgramSocket.on("open", () => {
+            isDeepgramOpen = true;
+            // while (messageBufferRef.current.length > 0 && isDeepgramOpen) {
+            //     console.log("SENDING MESSAGE BUFFER: ", messageBufferRef.current);
+            //     const message = messageBufferRef.current.shift();
+            //     deepgramSocket.send(message);
+            // }
+        });
+
+        deepgramSocket.addListener(LiveTranscriptionEvents.Transcript, (data) => {
+            const transcript = data.channel.alternatives[0].transcript;
+            
+            if (data.is_final) {
+                full_speech += transcript;
+                setInputMessage(prev => prev + transcript + " ");
+            }
+            resetTranscriptTimeout();
+        });
+
+        deepgramSocket.addListener(LiveTranscriptionEvents.UtteranceEnd, () => {
+            if (full_speech.length > 0) {
+                setInputMessage(prev => prev + full_speech);
+                full_speech = "";
+            }
+        });
+
+        deepgramSocket.addListener(LiveTranscriptionEvents.Close, async () => {
+            isDeepgramOpen = false;
+            clearInterval(keepAliveRef.current);
+            deepgramSocketRef.current = null;
+            setIsRecording(false);
+        });
+
+        deepgramSocket.addListener(LiveTranscriptionEvents.Error, async (error) => {
+            console.error("Network error:", error);
+            setIsRecording(false);
+        });
+    };
+
+    const [microphone, setMicrophone] = useState(null);
+
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            setIsRecording(true);
+            setupDeepgram();
+
+            const mediaRecorder = new MediaRecorder(stream);
+            setMicrophone(mediaRecorder);
+            mediaRecorder.addEventListener("dataavailable", event => {
+                if (deepgramSocketRef.current?.getReadyState() === 1) {
+                    deepgramSocketRef.current.send(event.data);
+                } else {
+                    messageBufferRef.current.push(event.data);
+                }
+            });
+
+            mediaRecorder.start(250);
+        } catch (err) {
+            console.error("Error accessing microphone:", err);
+        }
+    };
+
+    const stopRecording = () => {
+        setIsRecording(false);
+        if (microphone) {
+            microphone.stop();
+        }
+        if (deepgramSocketRef.current) {
+            deepgramSocketRef.current.finish();
+        }
+    };
 
     useEffect(() => {
         const newSocket = io('http://localhost:7777');
@@ -164,6 +283,14 @@ export const Agent = ({ selectedActions, behaviorText }) => {
                         <FaIcons.FaPaperclip 
                             onClick={() => fileInputRef.current.click()}
                             style={{ cursor: 'pointer', marginRight: '0.5rem' }}
+                        />
+                        <FaIcons.FaMicrophone
+                            onClick={isRecording ? stopRecording : startRecording}
+                            style={{ 
+                                cursor: 'pointer', 
+                                marginRight: '0.5rem',
+                                color: isRecording ? 'red' : 'inherit'
+                            }}
                         />
                         <input
                             type="text"
