@@ -120,6 +120,3 @@ def generate_and_execute(task):
     result = executor.execute_code(generated_code)
     print(result.output);
     return result.output;
-
-if __name__ == "__main__":
-    example_usage()

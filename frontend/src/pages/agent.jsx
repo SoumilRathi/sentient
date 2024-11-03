@@ -7,7 +7,7 @@ import "./styles/agent.css"
 import { LiveTranscriptionEvents, createClient } from "@deepgram/sdk";
 
 
-export const Agent = ({ selectedActions, behaviorText }) => {
+export const Agent = ({ agentId, selectedActions, behaviorText, onUpdateAgent }) => {
     const [socket, setSocket] = useState(null);
     const [messages, setMessages] = useState([]);
     const [inputMessage, setInputMessage] = useState("");
@@ -149,10 +149,12 @@ export const Agent = ({ selectedActions, behaviorText }) => {
 
         newSocket.on('message', (data) => {
             setIsWaiting(false);
-            setMessages(prev => [...prev, {
+            const updatedMessages = [...messages, {
                 text: data.message,
                 type: 'agent'
-            }]);
+            }];
+            setMessages(updatedMessages);
+            localStorage.setItem(`messages-${agentId}`, JSON.stringify(updatedMessages));
         });        
     
         setSocket(newSocket);
@@ -160,13 +162,21 @@ export const Agent = ({ selectedActions, behaviorText }) => {
         return () => {
             newSocket.close();
         };
-    }, []);
+    }, [agentId]);
 
     useEffect(() => {
         if (messagesContainerRef.current) {
             messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
         }
     }, [messages, isWaiting]);
+
+    useEffect(() => {
+        // Load messages from localStorage
+        const savedMessages = localStorage.getItem(`messages-${agentId}`);
+        if (savedMessages) {
+            setMessages(JSON.parse(savedMessages));
+        }
+    }, [agentId]);
 
     const handleFileUpload = (event) => {
         const files = Array.from(event.target.files);
@@ -203,14 +213,13 @@ export const Agent = ({ selectedActions, behaviorText }) => {
                 behaviorText: behaviorText
             };
 
-            // Add to local messages
-            setMessages(prev => [...prev, newMessage]);
+            const updatedMessages = [...messages, newMessage];
+            setMessages(updatedMessages);
+            localStorage.setItem(`messages-${agentId}`, JSON.stringify(updatedMessages));
             setIsWaiting(true);
             
-            // Send via socket
             socket.emit('user_message', newMessage);
 
-            // Clear inputs
             setInputMessage("");
             setAttachedImages([]);
         }
@@ -219,8 +228,9 @@ export const Agent = ({ selectedActions, behaviorText }) => {
     const resetMessages = () => {
         socket.emit('reset');
         setMessages([]);
+        localStorage.setItem(`messages-${agentId}`, JSON.stringify([]));
         setIsWaiting(false);
-    }
+    };
 
     const handleKeyPress = (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
