@@ -1,15 +1,10 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
-import { Chat } from './components/chat'
-import { Agent } from './pages/agent'
+import { Router } from './router'
+import './styles/App.css'
 
 function App() {
-
   return (
-   <Agent />
+    <Router />
   )
 }
 
-export default App
+export default App 

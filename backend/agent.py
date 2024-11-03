@@ -10,10 +10,14 @@ from helper_functions import sort_actions_by_priority, get_available_actions, us
 import threading
 import os
 from dotenv import load_dotenv
+from scrapy.crawler import CrawlerProcess
+from scrapy import Spider, Request
+from scrapingbee import ScrapingBeeClient
 
 # Load environment variables from .env file
 load_dotenv()
 
+scrapingbee_client = ScrapingBeeClient(api_key=os.getenv("SCRAPINGBEE_API_KEY"))
 
 class Agent:
     def __init__(self):
@@ -41,53 +45,56 @@ class Agent:
         pass
     
     def web_search(self, query):
-        """Conducts a web search using Google Custom Search API, scrapes the top results, and returns the extracted content"""
+        """Conducts a web search using Google Custom Search API, creates a Scrapy spider for deep content extraction"""
         search_url = f"https://www.googleapis.com/customsearch/v1"
         params = {
-            "key": os.getenv("GOOGLE_SEARCH_API_KEY"),
+            "key": os.getenv("GOOGLE_SEARCH_API_KEY"), 
             "cx": os.getenv("GOOGLE_CUSTOM_SEARCH_ENGINE_ID"),
             "q": query,
         }
         
         response = requests.get(search_url, params=params)
-        search_output = "";
+        search_output = f"Query: {query}\n\n"
+        
         if response.status_code == 200:
             search_results = response.json()
-
-            # Parse and scrape the top results
-            extracted_content = []
-            for item in search_results.get('items', [])[:5]:  # Limit to top 5 results
-                title = item.get('title')
-                link = item.get('link')
-                
-                try:
-                    page_content = self.scrape_webpage(link)
-                    extracted_content.append(f"Title: {title}\nContent: {page_content}\n")
-                except Exception as e:
-                    print(f"Failed to scrape {link}: {str(e)}")
-
-            search_output = "\n".join(extracted_content)
-            print(f"Extracted content from {len(extracted_content)} webpages")
-
+            
+            # Extract URLs from search results
+            urls = []
+            for item in search_results.get('items', [])[:5]:
+                urls.append(item.get('link'))
+            
+            for url in urls:
+                response = scrapingbee_client.get(url,
+                    params = { 
+                        'ai_query': query,
+                        'premium_proxy': True,
+                        'country_code': 'us',
+                    }
+                )
+                print(response.content.decode('utf-8'));
+                search_output += f"""
+                URL: {url}
+                CONTENT:
+                {response.content.decode('utf-8')}
+                """
+       
         else:
             print(f"Failed to retrieve search results, status code: {response.status_code}")
             return f"Failed to retrieve search results, status code: {response.status_code}"
 
-
-        if (search_output == ""):
+        if search_output == "":
             self.working_memory.store_observation("Web search returned no results.")
-            return;
+            return
 
         print("ALL SEARCH OUTPUT: ", search_output)
 
-        # process the search output into segments and add it to knowledge
-        self.working_memory.text_to_knowledge(search_output)
-        return;
-
-
+        # Process the search output into segments and add it to knowledge
+        self.working_memory.text_to_knowledge(search_output, query)
+        return
 
     def scrape_webpage(self, url):
-        """Scrapes the content of a webpage"""
+        """Legacy scraping method - now handled by Scrapy spider"""
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
         }
@@ -104,13 +111,11 @@ class Agent:
         # Extract text content
         text = soup.get_text()
         
-        # Break into lines and remove leading and trailing space on each
+        # Clean up text
         lines = (line.strip() for line in text.splitlines())
-        # Break multi-headlines into a line each
         chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-        # Drop blank lines
         text = '\n'.join(chunk for chunk in chunks if chunk)
-        # Limit the text to a reasonable length (e.g., first 1000 characters)
+        
         return text
 
     
@@ -245,6 +250,10 @@ class Agent:
                 print(f"Body: {body}")
         elif action_name == "reason":
             print(f"Reasoning: {action[7:]}")
+            self.working_memory.reason(action[7:])
+
+        elif action_name == "record":
+            self.working_memory.observations.append(action[6:])
 
         elif action_name == "learn":
             print(f"Learning: {action[6:]}")
@@ -310,3 +319,32 @@ class Agent:
         """Reset the agent to its initial state"""
         self.working_memory = WorkingMemory()
         self.long_term_memory = LongTermMemory()
+
+
+    def scrapetest(self):
+        print("SCRAPING TEST")
+        url = "https://www.tripadvisor.com/Restaurants-g3511549-Champaign_Urbana_Illinois.html"        
+        response = scrapingbee_client.get(url, params = {
+            'ai_query': 'top restaurants Champaign Urbana',
+            'premium_proxy': True,
+            'country_code': 'us',
+        })
+        try:
+            print(response)
+        except Exception as e:
+            print(f"Error printing response: {e}")
+            
+        try:
+            print(response.body)
+        except Exception as e:
+            print(f"Error printing response body: {e}")
+            
+        try:
+            print(response.content)
+        except Exception as e:
+            print(f"Error printing response content: {e}")
+            
+        try:
+            print(response.content.decode('utf-8'))
+        except Exception as e:
+            print(f"Error decoding response content: {e}")

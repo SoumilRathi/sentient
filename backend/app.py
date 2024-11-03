@@ -84,8 +84,7 @@ if __name__ == "__main__":
     print("Agent is ready. Starting SocketIO server...")
     # agent.long_term_memory.store_memory("semantic", "Taco Bell is the best mexican restaurant in Champaign")
     socketio.run(app, debug=True, port=7777)
-
-
+   
     # lt_memory = LongTermMemory();
 
     # print(lt_memory.retrieve_memory("Hey my name is Soumil"));

@@ -1,15 +1,16 @@
-import { useState } from "react";
-import { Chat } from "../components/chat"
-import "./styles/agent.css"
-import { useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { io } from "socket.io-client";
-
+import * as FaIcons from "react-icons/fa";
+import { FiRefreshCcw } from "react-icons/fi";
+import "./styles/agent.css"
+// import "../components/styles/chat.css"
+import { marked } from 'marked';
 
 export const Agent = () => {
-    const [selectedActions, setSelectedActions] = useState(['reply']);
-    const [behavior, setBehavior] = useState('');
     const [socket, setSocket] = useState(null);
     const [messages, setMessages] = useState([]);
+    const [inputMessage, setInputMessage] = useState("");
+    const messagesContainerRef = useRef(null);
 
     useEffect(() => {
         const newSocket = io('http://localhost:7777');
@@ -27,7 +28,6 @@ export const Agent = () => {
         });
 
         newSocket.on('message', (data) => {
-            console.log("Received agent message:", data);  // Debug print to verify
             setMessages(prev => [...prev, {
                 text: data.message,
                 type: 'agent'
@@ -41,113 +41,86 @@ export const Agent = () => {
         };
     }, []);
 
+    useEffect(() => {
+        if (messagesContainerRef.current) {
+            messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+        }
+    }, [messages]);
 
-    const startAgent = () => {
-        socket.emit('start', {
-            selectedActions: selectedActions,
-            behavior: behavior
-        });
-        setMessages([]);
-    }
+    const sendMessage = () => {
+        if (inputMessage.trim() !== "" && socket) {
+            // Add user message to chat
+            setMessages(prev => [...prev, {
+                text: inputMessage.trim(),
+                type: 'user'
+            }]);
+            
+            // Send message to server
+            socket.emit('message', { 
+                message: inputMessage.trim(),
+            });
 
-    const handleSendMessage = (message) => {
-        // Add user message to chat
-        setMessages(prev => [...prev, {
-            text: message,
-            type: 'user'
-        }]);
-        
-        // Send message to server
-        socket.emit('message', { 
-            message: message,
-        });
-    }
+            // Clear input
+            setInputMessage("");
+        }
+    };
 
-    const resetAgent = () => {
+    const resetMessages = () => {
         socket.emit('reset');
         setMessages([]);
     }
 
-    const handleActionChange = (action) => {
-        if (action === 'reply') {
-            alert("You can't disable replying");
-            return;
+    const handleKeyPress = (e) => {
+        if (e.key === "Enter") {
+            sendMessage();
         }
-
-        setSelectedActions(prev => {
-            if (prev.includes(action)) {
-                return prev.filter(a => a !== action);
-            } else {
-                return [...prev, action];
-            }
-        });
     };
 
     return (
-        <div className='website_container'>
-            <div className='config'>
-                <div className='config_item actions'>
-                    <h1 className="config_item_title actions_title">Actions</h1>
+        <div className='agent_container'>
+            <div className="chat_holder">
 
-                    <div className="config_item_content actions_area">
-                        <div className="action">
-                            <input 
-                                type="checkbox" 
-                                id="reply"
-                                checked={true}
-                                onChange={() => handleActionChange('reply')}
-                            />
-                            <label htmlFor="reply">Reply</label>
+                <div className="chat_header">
+                    <div className="reset_button">
+                        <FiRefreshCcw onClick={resetMessages} style={{ cursor: 'pointer' }} />
+                    </div>
+
+                    {/* <div className="settings_button">
+                        <FaIcons.FaCog style={{ cursor: 'pointer' }} />
+                    </div> */}
+                </div>
+               
+
+                <div className="chat_messages" ref={messagesContainerRef}>
+                    {messages.map((message, index) => (
+                        <div key={index} className={`chat_message ${message.type === 'agent' ? 'received' : 'sent'}`}>
+                            <div className="message">
+                                {message.type === 'agent' ? (
+                                    <div dangerouslySetInnerHTML={{
+                                        __html: marked.parse(message.text.replace(/^['"]|['"]$/g, ''))
+                                    }} />
+                                ) : (
+                                    message.text.replace(/^['"]|['"]$/g, '')
+                                )}
+                            </div>
                         </div>
-                        <div className="action">
-                            <input 
-                                type="checkbox" 
-                                id="email"
-                                checked={selectedActions.includes('email')}
-                                onChange={() => handleActionChange('email')}
-                            />
-                            <label htmlFor="email">Email</label>
-                        </div>
-                        <div className="action">
-                            <input 
-                                type="checkbox" 
-                                id="search"
-                                checked={selectedActions.includes('search')}
-                                onChange={() => handleActionChange('search')}
-                            />
-                            <label htmlFor="search">Search</label>
-                        </div>
-                        <div className="action">
-                            <input 
-                                type="checkbox" 
-                                id="browse"
-                                checked={selectedActions.includes('browse')}
-                                onChange={() => handleActionChange('browse')}
-                            />
-                            <label htmlFor="browse">Browse</label>
-                        </div>
-                       
+                    ))}
+                </div>
+
+                <div className="chat_input_holder">
+                    <div className="chat_input">
+                        <input
+                            type="text"
+                            className="chat_input_field"
+                            placeholder="Message your agent..."
+                            value={inputMessage}
+                            onChange={(e) => setInputMessage(e.target.value)}
+                            onKeyPress={handleKeyPress}
+                        />
+                        <FaIcons.FaPaperPlane onClick={sendMessage} style={{ cursor: 'pointer' }} />
                     </div>
                 </div>
-                <div className='config_item behavior'>
-                    <h1 className="config_item_title behavior_title">Behavior</h1>
-
-                    <textarea 
-                        className="config_item_content behavior_area" 
-                        value={behavior}
-                        onChange={(e) => setBehavior(e.target.value)}
-                    />
-                </div>
-
-                <div className="start_agent_container">
-                    <button className="start_agent" onClick={startAgent}>
-                        Start Agent
-                    </button>
-                </div>
-            </div>
-            <div className="chat">
-                <Chat messages={messages} setMessages={setMessages} socket={socket} onMessage={handleSendMessage} />
             </div>
         </div>
     )
-}
+} 

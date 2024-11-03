@@ -10,7 +10,10 @@ These actions involve reasoning and determining more knowledge within the workin
 These actions take information that is currently in your working memory and generate new knowledge and information based on that
 These will help you gain a better understanding of the task, and help you make better decisions.
 Here are the reasoning actions available to you:
-1. reason "FOCUS" -> Reason using the current working memory with the focus on a specific topic. Please note that reasoning is entirely based on the current working memory, and cannot use/introduce any external knowledge. Try to use this when there is some knowledge in the working memory that you can use to reason further.
+1. record <OBSERVATION> -> Record an observation about the current task. This should be used when you have something to say about the current task, or when you have noticed something about the task. This will add a new entry to your observations. 
+        This action is to be used when you have noticed something about your workflow or styling that has to be explicitly improved when you style the next time. Please do not use this action to take notes about the styling (since that is included within the style action). This action is only if you have noticed something going wrong, and you'd like to note it within your working memory so it doesn't happen again.
+        Do not use this action to record anything about the user input or the type of project you are working on. This action is only for your internal notes about your own personal workflow, and when something goes wrong with what you are doing.
+2. reason <FOCUS> -> Reason using the current working memory with the focus on a specific topic. Please note that reasoning is entirely based on the current working memory, and cannot use/introduce any external knowledge. Try to use this when there is some knowledge in the working memory that you can use to reason further.
 
 ## System Actions
 These actions involve interacting with the system itself.

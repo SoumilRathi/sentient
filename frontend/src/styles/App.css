@@ -19,14 +19,15 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
 }
 
-.config {
-  width: 50%;
-  height: 100%;
-}
-
-.chat {
-  width: 50%;
+.main_content {
+  width: 85%;
   height: 100%;
 }

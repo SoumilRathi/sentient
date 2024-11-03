@@ -10,22 +10,22 @@ grounding_actions = [
     {
         "name": "reply",
         "description": "Talk to the user / reply to the input. Note that replying to the user is final, and the decision loop will end after this action is selected. This means that you should only select it once you have finished the task, or when you need more user input to continue the task. Please note that the reply message should be in markdown format.",
-        "action": "reply [MESSAGE]"
+        "action": "reply <MESSAGE>"
     },
     {
         "name": "search", 
-        "description": "Search the web for information. This will be used to answer questions or retrieve information that is not available in your long term memory.",
-        "action": "search [QUERY]"
+        "description": "Search the web for information. This will be used to answer questions or retrieve information that is not available in your current working memory. Please note that this action is meant to be used to augment your knowledge, so use it only when the knowledge you need for a task is not available in your current working memory.",
+        "action": "search <QUERY>"
     },
     {
         "name": "browse",
         "description": "Browse the web for information. This will be used if you want to take any action that requires you to use the browser",
-        "action": "browse [INTENTION]"
+        "action": "browse <INTENTION>"
     },
     {
         "name": "email",
         "description": "Send an email to a specified email address. This will be used if you need to send an email to a user. Please do not use this unless you have specifically been asked to send an email. Please note that the body of the email should be in html format.",
-        "action": 'email "[EMAIL_ADDRESS]" "[SUBJECT]" """[BODY]"""'
+        "action": 'email "<EMAIL_ADDRESS>" "<SUBJECT>" """<BODY>"""'
     }
 ]
 
@@ -35,9 +35,12 @@ def get_available_actions(selected_actions):
 
     actions_instructions = load_file("actions.txt")
 
+    selected_actions = ["reply", "search", "email"]
+
     available_actions = []
     for action in grounding_actions:
-        available_actions.append(f"{action['action']} -> {action['description']}")
+        if action["name"] in selected_actions:
+            available_actions.append(f"{action['action']} -> {action['description']}")
     
     grounding_actions_str = "\n".join(available_actions)
     

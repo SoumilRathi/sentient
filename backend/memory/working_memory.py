@@ -83,7 +83,7 @@ class WorkingMemory:
             self.knowledge[phrase] = sentences
 
 
-    def text_to_knowledge(self, text):
+    def text_to_knowledge(self, text, query=None):
         """Parses a bunch of text into knowledge segments and then adds it to memory"""
 
         prompt = f"""
@@ -94,6 +94,13 @@ class WorkingMemory:
         <input_text>
         {text}
         </input_text>
+
+        { 
+            f"""When segmenting the text, please segment the knowledge relevant to the original search query: 
+            <query>
+            {query}
+            </query>""" if query else ""
+        }
 
         In case the previous observations prove to be useful, you can use them to help you analyze the text.
 
@@ -293,7 +300,69 @@ class WorkingMemory:
         print("RESPONSE: ",response)
 
 
+    def reason(self, query):
+        """Reason about the current working memory"""
+        prompt = f"""
+        You already have a working memory that contains a lot of knowledge and information you have about the current task. 
+
+        Your task is to use the knowledge and information in the working memory to reason about the current query.
+
+        Here is the query:
+        <query>
+        {query}
+        </query>
+
+        Here is the working memory:
+
+        <working_memory>
+        {self.print()}
+        </working_memory>
+
+        Instructions:
+        1. Please attempt to generate new knowledge about the current query based on the working memory.
+        2. Ensure that you do not make up any information that is not already given to you. Your task is to only use the information already present in the working memory and generating new knowledge/information based on that.
         
+        Return your thoughts and the new knowledge you have generated in <reasoning> tags.
+
+        Give a name/heading to the new knowledge you have generated, and then provide the new knowledge.
+
+        Your final output must strictly adhere to the following format:
+
+        <final>
+        "Heading for the new knowledge"
+        "Sentence 1 regarding the new knowledge",
+        "Sentence 2 regarding the new knowledge"
+        ...
+        </final>
+        """
+
+
+        response = use_claude(prompt)
+
+
+        # Extract the content between <final> tags
+        try:
+            # Find content between <final> tags
+            final_start = response.find("<final>") + len("<final>")
+            final_end = response.find("</final>")
+            final_content = response[final_start:final_end].strip().split("\n")
+
+            # First line is the title, rest are content
+            title = final_content[0].strip().strip('"')
+            content = [line.strip().strip('"').strip(',') for line in final_content[1:]]
+            content = [line for line in content if line] # Remove empty lines
+
+            # Store the knowledge
+            self.store_knowledge({
+                "title": title,
+                "content": content
+            })
+
+            return {title, content}
+
+        except Exception as e:
+            print(f"Error parsing reasoning response: {e}")
+            return None
 
     def print(self): 
         """Return a formatted string of the contents of working memory"""
