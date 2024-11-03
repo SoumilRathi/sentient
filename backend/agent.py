@@ -175,6 +175,7 @@ class Agent:
         6. If there is any task that has a reminder or a specific time associated with it, don't conduct the action now. Instead, set a reminder for the specified time, which will be added to your working memory when the reminder is triggered.
         7. Please note that if you notice a reminder for a task within your previous actions within your working memory, you should ignore that, since that's a reminder for the future. Any reminders that you actually have to act on will be present within your observations with the prefix "REMINDER:"
         8. If acting on a reminder within your observations, please first check if an action corresponding to that reminder has already been taken. If so, that reminder is no longer relevant and can be ignored.
+        9. If you will need any additional information from the user during the course of this task, prioritize asking the user for that information over any other action, so that the user can provide the information immediately and you can continue with the task. In this scenario, no matter what, this action will be the highest priority.
 
         Available actions:
         {get_available_actions(self.selected_actions)}
@@ -189,6 +190,7 @@ class Agent:
         - Which actions are most likely to lead to a productive outcome?
         - Are there any actions that might be redundant or less useful given the current context?
         4. Is there any action that requires other actions to be completed first? If so, give higher priority to the actions to be completed first.
+        5. Is there any additional information you need from the user to complete the task? If so, prioritize this action over all others.
 
         After your analysis, provide your final chosen actions in a JSON format. Here's an example of the expected output structure (note that this is just a format example, not a suggestion for actual actions):
 
@@ -319,7 +321,7 @@ class Agent:
         elif action_name == "code":
             task = action[5:].strip()
             print(f"Writing code: {task}")
-            result = generate_and_execute(task)
+            result = generate_and_execute(task, self.working_memory)
             self.working_memory.store_observation("Task to write code: " + task + "\n" + "Result: " + result)
 
         print(f"Executing action: {action}")

@@ -149,12 +149,15 @@ export const Agent = ({ agentId, selectedActions, behaviorText, onUpdateAgent })
 
         newSocket.on('message', (data) => {
             setIsWaiting(false);
-            const updatedMessages = [...messages, {
+            console.log("RECEIVED MESSAGE: ", data.message);
+            setMessages(prevMessages => [...prevMessages, {
                 text: data.message,
                 type: 'agent'
-            }];
-            setMessages(updatedMessages);
-            localStorage.setItem(`messages-${agentId}`, JSON.stringify(updatedMessages));
+            }]);
+            localStorage.setItem(`messages-${agentId}`, JSON.stringify([...messages, {
+                text: data.message,
+                type: 'agent'
+            }]));
         });        
     
         setSocket(newSocket);
@@ -213,9 +216,8 @@ export const Agent = ({ agentId, selectedActions, behaviorText, onUpdateAgent })
                 behaviorText: behaviorText
             };
 
-            const updatedMessages = [...messages, newMessage];
-            setMessages(updatedMessages);
-            localStorage.setItem(`messages-${agentId}`, JSON.stringify(updatedMessages));
+            setMessages(prevMessages => [...prevMessages, newMessage]);
+            localStorage.setItem(`messages-${agentId}`, JSON.stringify([...messages, newMessage]));
             setIsWaiting(true);
             
             socket.emit('user_message', newMessage);

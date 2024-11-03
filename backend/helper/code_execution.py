@@ -86,7 +86,7 @@ class CodeExecutor:
             self._clean_up(temp_file)
 
 
-def generate_and_execute(task):
+def generate_and_execute(task, working_memory):
     # Mock LLM client for demonstration
     
     # Initialize the system
@@ -95,7 +95,14 @@ def generate_and_execute(task):
     
     prompt = f"""
     You are an expert python programmer. You are tasked with writing python code to complete the following task:
+    <task>
     {task}
+    </task>
+
+    Here is the working memory of the agent so far, in case you need any information from it:
+    <working_memory>
+    {working_memory}
+    </working_memory>
 
     Please write the code in a way that is clean, readable, and efficient.
     Please write the code in a way that is easy to understand, and easy to modify if needed.
