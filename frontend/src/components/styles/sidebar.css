@@ -6,11 +6,9 @@
     padding: 1rem;
     box-sizing: border-box;
     border-right: 3px solid black;
-}
-
-.sidebar_content {
     display: flex;
     flex-direction: column;
+    justify-content: space-between;
     gap: 2rem;
 }
 
@@ -40,3 +38,15 @@
 .sidebar nav ul li a:hover {
     background-color: #333;
 } 
+
+.settings {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem; 
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    box-sizing: border-box;
+    border-radius: 4px;
+}

@@ -71,7 +71,26 @@ def load_file(file_path):
     with open(file_path, 'r') as file:
         return file.read()
 
-
+def process_images(images):
+    processed_images = []
+    for image_data in images:
+        image = image_data['image']
+        text = image_data['text']
+        if image.startswith('data:image/'):
+            image_type, image_data = image.split(',', 1)
+            media_type = image_type.split(';')[0].split(':')[1]
+            processed_images.append({
+                "image": {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": media_type,
+                        "data": image_data,
+                    }
+                },
+                "text": text
+            })
+    return processed_images
 
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
@@ -95,12 +114,12 @@ def use_claude(user_prompt, system_prompt=None, temperature=1, json=False, tools
         message_params["tools"] = tools
 
     content = []
-    # if images:
-    #     processed_images = process_images(images)
-    #     for i, image_data in enumerate(processed_images):
-    #         content.append(image_data["image"])
-    #         if image_data["text"]:
-    #             content.append({"type": "text", "text": f"Description for Image {i+1}: {image_data['text']}"})
+    if images and len(images) > 0:
+        processed_images = process_images(images)
+        for i, image_data in enumerate(processed_images):
+            content.append(image_data["image"])
+            if image_data["text"]:
+                content.append({"type": "text", "text": f"Description for Image {i+1}: {image_data['text']}"})
 
     content.append({"type": "text", "text": user_prompt})
     message_params["messages"][0]["content"] = content

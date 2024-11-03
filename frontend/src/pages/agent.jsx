@@ -3,14 +3,13 @@ import { io } from "socket.io-client";
 import * as FaIcons from "react-icons/fa";
 import { FiRefreshCcw } from "react-icons/fi";
 import { IoClose } from "react-icons/io5";
-import { BsFileEarmarkText } from "react-icons/bs";
 import "./styles/agent.css"
 
 export const Agent = () => {
     const [socket, setSocket] = useState(null);
     const [messages, setMessages] = useState([]);
     const [inputMessage, setInputMessage] = useState("");
-    const [attachments, setAttachments] = useState([]);
+    const [attachedImages, setAttachedImages] = useState([]);
     const messagesContainerRef = useRef(null);
     const fileInputRef = useRef(null);
 
@@ -49,60 +48,48 @@ export const Agent = () => {
         }
     }, [messages]);
 
-    const handleFileUpload = (e) => {
-        const files = Array.from(e.target.files);
-        const newAttachments = files.map(file => ({
-            file,
-            preview: file.type.startsWith('image/') 
-                ? URL.createObjectURL(file) 
-                : null,
-            type: file.type.startsWith('image/') ? 'image' : 'document',
-            name: file.name
-        }));
-        
-        setAttachments(prev => [...prev, ...newAttachments]);
-    };
+    const handleFileUpload = (event) => {
+        const files = Array.from(event.target.files);
+        const allowedTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+        const validFiles = files.filter(file => allowedTypes.includes(file.type));
 
-    const removeAttachment = (index) => {
-        setAttachments(prev => {
-            const newAttachments = [...prev];
-            if (newAttachments[index].preview) {
-                URL.revokeObjectURL(newAttachments[index].preview);
-            }
-            newAttachments.splice(index, 1);
-            return newAttachments;
+        if (validFiles.length !== files.length) {
+            alert('Please upload only PNG, JPEG, GIF, or WebP images.');
+        }
+
+        Promise.all(validFiles.map(file => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        })).then(results => {
+            setAttachedImages(prevImages => [...prevImages, ...results]);
         });
     };
 
+    const removeAttachedImage = (index) => {
+        setAttachedImages(prevImages => prevImages.filter((_, i) => i !== index));
+    };
+
     const sendMessage = () => {
-        if ((inputMessage.trim() !== "" || attachments.length > 0) && socket) {
-            // Create FormData for files
-            const formData = new FormData();
-            attachments.forEach((attachment, index) => {
-                formData.append('files', attachment.file);
-            });
-            formData.append('message', inputMessage.trim());
-
-            // Add message to chat
-            setMessages(prev => [...prev, {
+        if (inputMessage.trim() !== '' || attachedImages.length > 0) {
+            const newMessage = {
                 text: inputMessage.trim(),
-                type: 'user',
-                attachments: attachments.map(att => ({
-                    type: att.type,
-                    preview: att.preview,
-                    name: att.name
-                }))
-            }]);
-            
-            // Send message and files to server
-            socket.emit('message', { 
-                message: inputMessage.trim(),
-                files: formData
-            });
+                images: attachedImages,
+                type: 'user'
+            };
 
-            // Clear input and attachments
+            // Add to local messages
+            setMessages(prev => [...prev, newMessage]);
+            
+            // Send via socket
+            socket.emit('user_message', newMessage);
+
+            // Clear inputs
             setInputMessage("");
-            setAttachments([]);
+            setAttachedImages([]);
         }
     };
 
@@ -118,8 +105,6 @@ export const Agent = () => {
         }
     };
 
-    console.log(messages);
-
     return (
         <div className='agent_container'>
             <div className="chat_holder">
@@ -128,25 +113,17 @@ export const Agent = () => {
                         <FiRefreshCcw onClick={resetMessages} style={{ cursor: 'pointer' }} />
                     </div>
                 </div>
-                
 
                 <div className="chat_messages" ref={messagesContainerRef}>
                     {messages.map((message, index) => (
                         <div key={index} className={`chat_message ${message.type === 'agent' ? 'received' : 'sent'}`}>
                             <div className="message">
                                 {message.text?.replace(/^'|'$/g, '')}
-                                {message.attachments && message.attachments.length > 0 && (
-                                    <div className="attachments_preview">
-                                        {message.attachments.map((att, attIndex) => (
-                                            <div key={attIndex} className="attachment">
-                                                {att.type === 'image' ? (
-                                                    <img src={att.preview} alt="attachment" />
-                                                ) : (
-                                                    <div className="document_preview">
-                                                        <BsFileEarmarkText />
-                                                        <span>{att.name}</span>
-                                                    </div>
-                                                )}
+                                {message.images && message.images.length > 0 && (
+                                    <div className="images_preview">
+                                        {message.images.map((image, imgIndex) => (
+                                            <div key={imgIndex} className="attachment">
+                                                <img src={image} alt="attachment" />
                                             </div>
                                         ))}
                                     </div>
@@ -157,32 +134,17 @@ export const Agent = () => {
                 </div>
 
                 <div className="chat_input_holder">
-                    {attachments.length > 0 && (
-                        <div className="attachments_preview">
-                            {attachments.map((attachment, index) => (
-                                <div key={index} className="attachment">
-                                    {attachment.type === 'image' ? (
-                                        <div className="image_preview">
-                                            <img src={attachment.preview} alt="preview" />
-                                            <button 
-                                                className="remove_attachment"
-                                                onClick={() => removeAttachment(index)}
-                                            >
-                                                <IoClose />
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div className="document_preview">
-                                            <BsFileEarmarkText />
-                                            <span>{attachment.name}</span>
-                                            <button 
-                                                className="remove_attachment"
-                                                onClick={() => removeAttachment(index)}
-                                            >
-                                                <IoClose />
-                                            </button>
-                                        </div>
-                                    )}
+                    {attachedImages.length > 0 && (
+                        <div className="images_preview">
+                            {attachedImages.map((image, index) => (
+                                <div key={index} className="image_preview">
+                                    <img src={image} alt="preview" />
+                                    <button 
+                                        className="remove_attachment"
+                                        onClick={() => removeAttachedImage(index)}
+                                    >
+                                        <IoClose />
+                                    </button>
                                 </div>
                             ))}
                         </div>
@@ -206,7 +168,7 @@ export const Agent = () => {
                             style={{ display: 'none' }}
                             onChange={handleFileUpload}
                             multiple
-                            accept="image/*,.pdf,.doc,.docx,.txt,.js,.jsx,.ts,.tsx,.py,.java,.cpp,.c,.cs,.html,.css,.json,.xml,.yaml,.yml,.md"
+                            accept=".png,.jpg,.jpeg,.gif,.webp"
                         />
                         <FaIcons.FaPaperPlane onClick={sendMessage} style={{ cursor: 'pointer' }} />
                     </div>

@@ -32,6 +32,7 @@ class Agent:
         self.working_memory = WorkingMemory()
         self.long_term_memory = LongTermMemory()
         self.client_sid = None
+        self.images = []
         # self.actions_instructions = self.load_actions_from_file("actions.txt")
         self.decision_loop_running = False
         self.decision_thread = None
@@ -202,7 +203,7 @@ class Agent:
 
         """
 
-        response = use_claude(prompt)
+        response = use_claude(prompt, images=self.images)
 
         print("PROPOSED ACTIONS + THOUGHT PROCESS: ", response)
 
@@ -346,7 +347,7 @@ class Agent:
             
             print("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n")
     
-    def receive_input(self, input, client_sid):
+    def receive_input(self, input, client_sid, images=[]):
         """Receive input from the user"""
         self.working_memory.store_observation(input)
         self.working_memory.store_conversation_history({
@@ -354,6 +355,8 @@ class Agent:
             "message": input
         })
         self.working_memory.get_variables_from_input()
+        if (images and len(images) > 0):
+            self.images = images
         self.client_sid = client_sid
         if not self.decision_loop_running:
             self.decision_thread = threading.Thread(target=self.make_decision)
