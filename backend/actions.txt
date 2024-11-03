@@ -11,3 +11,7 @@ These actions take information that is currently in your working memory and gene
 These will help you gain a better understanding of the task, and help you make better decisions.
 Here are the reasoning actions available to you:
 1. reason "FOCUS" -> Reason using the current working memory with the focus on a specific topic. Please note that reasoning is entirely based on the current working memory, and cannot use/introduce any external knowledge. Try to use this when there is some knowledge in the working memory that you can use to reason further.
+
+## System Actions
+These actions involve interacting with the system itself.
+1. finish -> Finish the current task. This will end the decision loop, and return control back to the user. This should be used when you think you have completed the task, or when you are sure that you cannot continue the task further. Typically, you can use this action after you have styled the code and think that it is close enough to the desired output.

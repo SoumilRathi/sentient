@@ -26,6 +26,7 @@ class WorkingMemory:
         # for example, if the agent is trying to book a flight, the variables could be the departure and arrival airports, the dates of the flight, etc.
         # if the agent is trying to find a restaurant, the variables could be the type of food, the price range, the location, etc.
         # if the agent is trying to send an email, the variables would be the email address.
+        self.conversation_history = []
     
     def store_observation(self, observation):
         """Store an observation or final output"""
@@ -34,6 +35,10 @@ class WorkingMemory:
     def store_action(self, action):
         """Store an action taken"""
         self.actions.append(action)
+
+    def store_conversation_history(self, conversation_history):
+        """Store a conversation history"""
+        self.conversation_history.append(conversation_history)
 
     def retrieve_all(self):
         """Retrieve all contents of working memory"""
@@ -178,8 +183,24 @@ class WorkingMemory:
 
     def set_variable(self, variable_name, variable_value):
         """Set a variable"""
-        self.variables[variable_name] = variable_value
-    
+        if variable_name in self.variables:
+            self.variables[variable_name] = variable_value
+        else:
+            # check to see if it meets the identify threshold
+            phrase_embedding = model.encode(variable_name)
+            best_match = None
+            highest_similarity = IDENTITY_THRESHOLD
+            for variable_key in self.variables:
+                existing_embedding = model.encode(variable_key)
+                similarity = dot(phrase_embedding, existing_embedding)/(norm(phrase_embedding)*norm(existing_embedding))
+                if similarity >= IDENTITY_THRESHOLD and similarity > highest_similarity:
+                    highest_similarity = similarity
+                    best_match = variable_key
+            
+            if best_match:
+                self.variables[best_match] = variable_value
+            else:
+                self.variables[variable_name] = variable_value
     
     def get_related_variables(self, phrase):
         """Get related variables"""
@@ -192,6 +213,88 @@ class WorkingMemory:
                 related_variables.append(variable)
         return related_variables
 
+
+    def get_variables_from_input(self):
+        """This function will be called after each input, to extract important variables that the user may have provided. The variables are entirely dependent on the user, so it can be assumed that they can fully be extracted from the input"""
+        
+        all_input_text = ""
+        # Get last 10 conversation history entries
+        recent_history = self.conversation_history[-10:] if len(self.conversation_history) > 10 else self.conversation_history
+        
+        # Build input text from conversation history
+        for entry in recent_history:
+            if entry["from"] == "user":
+                all_input_text += f"User: {entry['message']}\n"
+            else:
+                all_input_text += f"Agent: {entry['message']}\n"
+
+        # this way the all input text is effectively the entire history of the conversation
+
+        prompt = f"""
+
+        You are an advanced AI specialized in information extraction and organization. Your task is to analyze a given text, which is typically a conversation history, and identify distinct user-entered variables regarding any personal information that you need to remember along with their values. Your goal is to segment the conversation and extract important variables that the user may have provided during the interaction.
+
+        Here is the text you need to analyze:
+
+        <input_text>
+        {all_input_text}
+        </input_text>
+
+        Please follow these steps to complete the task:
+
+        1. Carefully read through the entire text.
+        2. In <variable_extraction> tags:
+        a. As you read through the text, write down each potential variable you encounter, along with its value and the surrounding context. Number each variable.
+        b. Categorize each variable (e.g., personal information, preferences, numerical data).
+        c. After your initial pass, scan the text again to check for any missed variables, especially short names like "email_address".
+        d. Compile a final list of variables and their values based on your analysis.
+        3. Ensure that the variables you extract are relevant to the user's personal information, and not just any random variables.
+        4. Convert the list into a JSON object with variable names as keys and their values as values.
+        5. Return the JSON object.
+
+        Your variable extraction should look something like this:
+        <variable_extraction>
+        1. Potential variable: [variable name]
+        Value: [corresponding value]
+        Category: [category of the variable]
+        Context: [surrounding text or reasoning for identification]
+
+        2. Potential variable: [another variable name]
+        Value: [corresponding value]
+        Category: [category of the variable]
+        Context: [surrounding text or reasoning for identification]
+
+        [Continue for all identified variables]
+
+        Second pass for missed variables:
+        [List any additional variables found]
+
+        Final list of variables and values:
+        - [variable1]: [value1]
+        - [variable2]: [value2]
+        [etc.]
+        </variable_extraction>
+
+        Your final output must strictly adhere to the following JSON format:
+
+        {{
+        "variable_name_1": "variable_value_1",
+        "variable_name_2": "variable_value_2"
+        }}
+
+        Remember to include all identified variables, even if they are short names like "email_address". Ensure that your JSON is properly formatted and that all variable names and values are correctly extracted from the input text.
+
+        """
+
+        print("PROMPT: ",prompt)
+
+        response = use_claude(prompt)
+
+        print("RESPONSE: ",response)
+
+
+        
+
     def print(self): 
         """Return a formatted string of the contents of working memory"""
         return f"""## Observations
@@ -203,6 +306,6 @@ class WorkingMemory:
         ## Knowledge
         {[strings for strings in self.knowledge.values()] if self.knowledge else "No knowledge recorded or reasoned."}
         
-        ## Variables
+        ## User-Specific Variables
         {self.variables if self.variables else "No variables set yet."}
         """

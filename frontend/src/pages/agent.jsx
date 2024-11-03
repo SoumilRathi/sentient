@@ -102,6 +102,15 @@ export const Agent = () => {
                         <div className="action">
                             <input 
                                 type="checkbox" 
+                                id="email"
+                                checked={selectedActions.includes('email')}
+                                onChange={() => handleActionChange('email')}
+                            />
+                            <label htmlFor="email">Email</label>
+                        </div>
+                        <div className="action">
+                            <input 
+                                type="checkbox" 
                                 id="search"
                                 checked={selectedActions.includes('search')}
                                 onChange={() => handleActionChange('search')}
@@ -117,6 +126,7 @@ export const Agent = () => {
                             />
                             <label htmlFor="browse">Browse</label>
                         </div>
+                       
                     </div>
                 </div>
                 <div className='config_item behavior'>

@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 from openai import OpenAI
 from memory.working_memory import WorkingMemory
 from memory.lt_memory import LongTermMemory
-from helper_functions import sort_actions_by_priority, get_available_actions, use_claude
+from helper_functions import sort_actions_by_priority, get_available_actions, use_claude, send_email
 import threading
 import os
 from dotenv import load_dotenv
@@ -14,7 +14,6 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-client = OpenAI(api_key='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')
 
 class Agent:
     def __init__(self):
@@ -151,6 +150,7 @@ class Agent:
         2. Use only the provided actions to acquire new knowledge.
         3. Consider how to provide the best eventual output based on the given input.
         4. Choose actions that will help you reach that output.
+        5. When you have to enter or use explicit variables, identify if you have the required variable in your working memory. If you do, use it. If not, identify the best way to get the value you need. This could be asking the user, searching the web, or more. Determine this based on the variable at hand.
 
         Available actions:
         {get_available_actions(self.selected_actions)}
@@ -183,15 +183,33 @@ class Agent:
 
         print("PROPOSED ACTIONS + THOUGHT PROCESS: ", response)
 
-        start = response.find('{')
-        end = response.find('}') + 1
-        if start != -1 and end != -1:
-            proposed_actions = json.loads(response[start:end])["actions"]
-        else:
-            proposed_actions = "{}"  # Return empty array if no brackets found
-
-        action_to_take = proposed_actions[0]
+        # Find the <final> tag and extract JSON content
+        final_start = response.find('<final>')
+        final_end = response.find('</final>')
         
+        if final_start != -1 and final_end != -1:
+            # Extract JSON string between <final> tags and handle escaped quotes
+            json_str = response[final_start + 7:final_end].strip()
+            # Replace escaped single quotes with regular single quotes
+            json_str = json_str.replace("\\'", "'")
+            try:
+                proposed_actions = json.loads(json_str)["actions"]
+            except json.JSONDecodeError as e:
+                print(f"JSON decode error: {e}")
+                # If JSON parsing fails, try to extract actions using string manipulation
+                if '"actions": [' in json_str:
+                    actions_start = json_str.find('"actions": [') + 11
+                    actions_end = json_str.rfind(']')
+                    actions_str = json_str[actions_start:actions_end+1]
+                    # Parse the array string manually
+                    proposed_actions = [a.strip()[1:-1] for a in actions_str.split(',')]
+                else:
+                    proposed_actions = []
+        else:
+            proposed_actions = []  # Return empty list if no <final> tags found
+
+        # Take first proposed action if available, otherwise None
+        action_to_take = proposed_actions[0] if proposed_actions else None
         return action_to_take
         
     
@@ -205,35 +223,40 @@ class Agent:
         if action_name == "reply":
             if self.reply_callback:
                 self.reply_callback(action[6:], self.client_sid)
-            isFinal = True
+            self.working_memory.store_conversation_history({
+                "from": "agent",
+                "message": action[6:]
+            })
         elif action_name == "search":
             query = action[7:].strip('"')  # Extract search query 
             self.web_search(query)
             print(f"Search completed for query: {query}")
-        elif action_name == "retrieve":
-            print("RETRIEVING MEMORY", action)
-
-            # Split the action, but keep quoted parts together
-            action_parts = re.findall(r'[^\s"]+|"[^"]*"', action)
-            
-            # get the second word of the action
-            memory_type = action_parts[1]
-            # Join the rest of the parts as the memory_request, removing quotes if present
-            memory_request = ' '.join(action_parts[2:]).strip('"')
-
-            # assume that the retrieved memory is empty for now (no memory)
-            retrieved_memory = self.long_term_memory.retrieve_memory(memory_type, memory_request)
-
-            self.working_memory.store_retrieved_memory(memory_type, memory_request, retrieved_memory)
-
-            print("MEMORY RETRIEVED AND STORED")
-            print(self.working_memory.retrieved_memory)
-
+        elif action_name == "email":
+            print(f"Sending email: {action[7:]}")
+            # Extract email, subject and body from the action string
+            email_match = re.search(r'"([^"]+)"\s+"([^"]+)"\s+"""([\s\S]+?)"""', action[6:])
+            if email_match:
+                email_address = email_match.group(1)
+                subject = email_match.group(2)
+                body = email_match.group(3)
+                send_email(email_address, subject, body)
+                print(f"Sending email to: {email_address}")
+                print(f"Subject: {subject}") 
+                print(f"Body: {body}")
         elif action_name == "reason":
             print(f"Reasoning: {action[7:]}")
 
         elif action_name == "learn":
             print(f"Learning: {action[6:]}")
+
+        elif action_name == "finish":
+            self.learn()
+            try:
+                if self.finish_callback:
+                    self.finish_callback(self.client_sid, self.project_id)
+            except Exception as e:
+                print("lmao no finish callback")
+            isFinal = True
 
         print(f"Executing action: {action}")
 
@@ -269,11 +292,19 @@ class Agent:
     def receive_input(self, input, client_sid):
         """Receive input from the user"""
         self.working_memory.store_observation(input)
+        self.working_memory.store_conversation_history({
+            "from": "user",
+            "message": input
+        })
+        self.working_memory.get_variables_from_input()
         self.client_sid = client_sid
         if not self.decision_loop_running:
             self.decision_thread = threading.Thread(target=self.make_decision)
             self.decision_thread.start()
 
+    def learn(self):
+        """Learn from the current working memory"""
+        print("LEARNING FROM WORKING MEMORY");
 
     def reset(self):
         """Reset the agent to its initial state"""
