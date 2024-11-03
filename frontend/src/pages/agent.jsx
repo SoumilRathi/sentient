@@ -78,7 +78,9 @@ export const Agent = () => {
             const newMessage = {
                 text: inputMessage.trim(),
                 images: attachedImages,
-                type: 'user'
+                type: 'user',
+                selectedActions: selectedActions,
+                behaviorText: behaviorText
             };
 
             // Add to local messages

@@ -31,3 +31,39 @@ body {
   width: 85%;
   height: 100%;
 }
+
+.popup_holder {
+  width: 100vw;
+  position: relative;
+  height: 100vh;
+  display: flex;
+  box-sizing: border-box;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(0.2rem) brightness(90%);
+}
+
+.popup_holder.overlay {
+  backdrop-filter: none;
+}
+
+.popup {
+  /* background-color: white; */
+  z-index: 9999;
+  width: 60%;
+  height: 60%;
+  max-height: 60%;
+  background: white;
+  border-radius: 2rem;
+  border: .1px solid lightgray;
+  box-shadow: 0px 2px 5px rgb(0,0,0,0.2);
+  display: flex;
+  flex-direction: column;
+  /* justify-content: space-between; */
+  align-items: center;
+  text-align: left;
+  padding: 2rem;
+  box-sizing: border-box;
+  position: relative;
+}

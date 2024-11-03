@@ -35,8 +35,6 @@ def get_available_actions(selected_actions):
 
     actions_instructions = load_file("actions.txt")
 
-    selected_actions = ["reply", "search", "email"]
-
     available_actions = []
     for action in grounding_actions:
         if action["name"] in selected_actions:

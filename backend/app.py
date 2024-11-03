@@ -41,6 +41,8 @@ def handle_start(data):
 def handle_message(data):
     text = data.get('text', '')
     received_images = data.get('images', [])
+    selectedActions = data.get('selectedActions', [])
+    behaviorText = data.get('behaviorText', '')
     images = []
     for image in received_images:
         images.append({"image": image, "text": text})
@@ -51,7 +53,7 @@ def handle_message(data):
     
     print("FULL INPUT", full_input)
     client_sid = request.sid
-    agent.receive_input(full_input, client_sid, images=images)
+    agent.receive_input(full_input, client_sid, images=images, selectedActions=selectedActions, behaviorText=behaviorText)
 
 @socketio.on('reset')
 def handle_reset():

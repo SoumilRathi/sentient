@@ -36,7 +36,7 @@ class Agent:
         # self.actions_instructions = self.load_actions_from_file("actions.txt")
         self.decision_loop_running = False
         self.decision_thread = None
-        self.selected_actions = ["reply"]
+        self.selected_actions = ["reply", "email", "search"]
         self.behavior = ""
         self.reminders: Dict[datetime, List[dict]] = {}
 
@@ -347,7 +347,7 @@ class Agent:
             
             print("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n")
     
-    def receive_input(self, input, client_sid, images=[]):
+    def receive_input(self, input, client_sid, images=[], selectedActions=[], behaviorText=""):
         """Receive input from the user"""
         self.working_memory.store_observation(input)
         self.working_memory.store_conversation_history({
@@ -355,6 +355,10 @@ class Agent:
             "message": input
         })
         self.working_memory.get_variables_from_input()
+        if selectedActions and len(selectedActions) > 0:
+            self.selected_actions = selectedActions
+        if behaviorText and behaviorText != "":
+            self.behavior = behaviorText
         if (images and len(images) > 0):
             self.images = images
         self.client_sid = client_sid
