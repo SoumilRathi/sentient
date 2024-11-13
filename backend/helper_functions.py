@@ -27,11 +27,11 @@ grounding_actions = [
         "description": "Send an email to a specified email address. This will be used if you need to send an email to a user. Please do not use this unless you have specifically been asked to send an email. Please note that the body of the email should be in html format. Ensure that the body is always in html format, as it will present an error otherwise.",
         "action": 'email "<EMAIL_ADDRESS>" "<SUBJECT>" """<BODY>"""'
     },
-    {
-        "name": "code",
-        "description": "Write python code to run and execute, and to view the output of the code. This action is meant to be used whenever you need to write and execute python code, whether that is because you need to view an output/result from the code, or because you need to write code to complete the task. You don't need to write the code yourself, just describe what you want to do, and the code will be written by another agent.",
-        "action": "code <INTENTION>"
-    }
+    # {
+    #     "name": "code",
+    #     "description": "Write python code to run and execute, and to view the output of the code. This action is meant to be used whenever you need to write and execute python code, whether that is because you need to view an output/result from the code, or because you need to write code to complete the task. You don't need to write the code yourself, just describe what you want to do, and the code will be written by another agent.",
+    #     "action": "code <INTENTION>"
+    # }
 ]
 
 
