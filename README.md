@@ -34,3 +34,18 @@ This repository contains sub-repositories for the frontend and backend. You can 
 ## How it works
 
 ![image](./Architecture.png)
+
+The AI system adds additional cognitive modules to the LLM which allows us to be more realiable. Here is a brief overview of how they work:
+
+### Knowledge 
+
+Sentient stores information that it gains - through user input and the internet - in an embedding-based format. This means that knowledge is condensed into segments with embeddings as headings, allowing for relevant and efficient retreivel. 
+
+### Reasoning
+
+Sentient uses LLMs to explicitly reason through its existing knowledge and expand the explicit knowledge that is has, allowing Sentient to make better decisions with more knowledge.
+
+### Memory
+
+The platform explicitly stores knowledge and user-specific variables, letting the platform get better at context-aware tasks over time. 
+
