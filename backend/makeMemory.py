@@ -89,6 +89,4 @@ text = "Use the CSS property background-color to change the color of the backgro
 
 
 
-print(results);
-
 print("ALL DONE!")

@@ -22,14 +22,17 @@ body {
   height: 100vh;
   width: 100vw;
   overflow: hidden;
-  padding: 0;
+  padding: 0 2rem;
+  padding-top: 1rem;
+  background-color: var(--bg);
   margin: 0;
   box-sizing: border-box;
 }
 
 .main_content {
-  width: 85%;
+  width: 100%;
   height: 100%;
+  background: var(--bg);
 }
 
 .popup_holder {
@@ -54,7 +57,7 @@ body {
   width: 60%;
   height: 60%;
   max-height: 60%;
-  background: white;
+  background: var(--bg);
   border-radius: 2rem;
   border: .1px solid lightgray;
   box-shadow: 0px 2px 5px rgb(0,0,0,0.2);

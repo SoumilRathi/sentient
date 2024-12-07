@@ -1,136 +1,26 @@
 import { useState, useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 import * as FaIcons from "react-icons/fa";
-import { FiRefreshCcw } from "react-icons/fi";
+import { FiRefreshCcw, FiMaximize2 } from "react-icons/fi";
 import { IoClose } from "react-icons/io5";
 import "./styles/agent.css"
-import { LiveTranscriptionEvents, createClient } from "@deepgram/sdk";
+import { motion, AnimatePresence } from "framer-motion";
+import Markdown from 'react-markdown'
 
-
-export const Agent = ({ agentId, selectedActions, behaviorText, onUpdateAgent }) => {
+export const Agent = ({ selectedActions, behaviorText }) => {
     const [socket, setSocket] = useState(null);
     const [messages, setMessages] = useState([]);
     const [inputMessage, setInputMessage] = useState("");
     const [attachedImages, setAttachedImages] = useState([]);
     const [isWaiting, setIsWaiting] = useState(false);
-    const [isRecording, setIsRecording] = useState(false);
     const messagesContainerRef = useRef(null);
     const fileInputRef = useRef(null);
-    const deepgramSocketRef = useRef(null);
-    const keepAliveRef = useRef(null);
-    const messageBufferRef = useRef([]);
+    const [browsingURL, setBrowsingURL] = useState(null);
+    const [isPopupMinimized, setIsPopupMinimized] = useState(false);
+    const [popupPosition, setPopupPosition] = useState({ x: 100, y: 100 });
 
-    let deepgramClient;
-    const deepgramKey = import.meta.env.VITE_DEEPGRAM_KEY;
-    deepgramClient = createClient(deepgramKey, {
-        global: { fetch: { options: { proxy: { url: "http://localhost:5174" } } } },
-    });
-    const setupDeepgram = () => {
-        let full_speech = "";
-        let transcriptTimeout;
-        const timeoutDuration = 2500;
-
-        const deepgramSocket = deepgramClient.listen.live({
-            language: "en",
-            punctuate: true,
-            smart_format: true,
-            model: "nova-2",
-            interim_results: true,
-            utterance_end_ms: "1000",
-            vad_events: true,
-            endpointing: 300
-        });
-
-        deepgramSocketRef.current = deepgramSocket;
-        let isDeepgramOpen = false;
-
-        if (keepAliveRef.current) clearInterval(keepAliveRef.current);
-        keepAliveRef.current = setInterval(() => {
-            deepgramSocket.keepAlive();
-        }, 8000);
-
-        const resetTranscriptTimeout = () => {
-            clearTimeout(transcriptTimeout);
-            transcriptTimeout = setTimeout(() => {
-                if (full_speech.length > 0) {
-                    setInputMessage(prev => prev + full_speech);
-                    full_speech = "";
-                }
-            }, timeoutDuration);
-        };
-
-        deepgramSocket.on("open", () => {
-            isDeepgramOpen = true;
-            // while (messageBufferRef.current.length > 0 && isDeepgramOpen) {
-            //     console.log("SENDING MESSAGE BUFFER: ", messageBufferRef.current);
-            //     const message = messageBufferRef.current.shift();
-            //     deepgramSocket.send(message);
-            // }
-        });
-
-        deepgramSocket.addListener(LiveTranscriptionEvents.Transcript, (data) => {
-            const transcript = data.channel.alternatives[0].transcript;
-            
-            if (data.is_final) {
-                full_speech += transcript;
-                setInputMessage(prev => prev + transcript + " ");
-            }
-            resetTranscriptTimeout();
-        });
-
-        deepgramSocket.addListener(LiveTranscriptionEvents.UtteranceEnd, () => {
-            if (full_speech.length > 0) {
-                setInputMessage(prev => prev + full_speech);
-                full_speech = "";
-            }
-        });
-
-        deepgramSocket.addListener(LiveTranscriptionEvents.Close, async () => {
-            isDeepgramOpen = false;
-            clearInterval(keepAliveRef.current);
-            deepgramSocketRef.current = null;
-            setIsRecording(false);
-        });
-
-        deepgramSocket.addListener(LiveTranscriptionEvents.Error, async (error) => {
-            console.error("Network error:", error);
-            setIsRecording(false);
-        });
-    };
-
-    const [microphone, setMicrophone] = useState(null);
-
-    const startRecording = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            setIsRecording(true);
-            setupDeepgram();
-
-            const mediaRecorder = new MediaRecorder(stream);
-            setMicrophone(mediaRecorder);
-            mediaRecorder.addEventListener("dataavailable", event => {
-                if (deepgramSocketRef.current?.getReadyState() === 1) {
-                    deepgramSocketRef.current.send(event.data);
-                } else {
-                    messageBufferRef.current.push(event.data);
-                }
-            });
-
-            mediaRecorder.start(250);
-        } catch (err) {
-            console.error("Error accessing microphone:", err);
-        }
-    };
-
-    const stopRecording = () => {
-        setIsRecording(false);
-        if (microphone) {
-            microphone.stop();
-        }
-        if (deepgramSocketRef.current) {
-            deepgramSocketRef.current.finish();
-        }
-    };
+    const [isSearching, setIsSearching] = useState(false);
+    const [searchingLogos, setSearchingLogos] = useState([]);
 
     useEffect(() => {
         const newSocket = io('http://localhost:7777');
@@ -149,37 +39,58 @@ export const Agent = ({ agentId, selectedActions, behaviorText, onUpdateAgent })
 
         newSocket.on('message', (data) => {
             setIsWaiting(false);
-            console.log("RECEIVED MESSAGE: ", data.message);
-            setMessages(prevMessages => [...prevMessages, {
+            setMessages(prev => [...prev, {
                 text: data.message,
                 type: 'agent'
             }]);
-            localStorage.setItem(`messages-${agentId}`, JSON.stringify([...messages, {
-                text: data.message,
-                type: 'agent'
-            }]));
         });        
+
+        newSocket.on('reply_stream', (data) => {
+            setIsWaiting(false);
+            setMessages(prev => {
+                const newMessages = [...prev];
+                if (newMessages.length > 0 && newMessages[newMessages.length - 1].type === 'agent') {
+                    newMessages[newMessages.length - 1] = {
+                        text: data.message,
+                        type: 'agent'
+                    };
+                } else {
+                    newMessages.push({
+                        text: data.message,
+                        type: 'agent'
+                    });
+                }
+                return newMessages;
+            });
+        });  
+
+        newSocket.on('browsing_url', (data) => {
+            setBrowsingURL(data.url);
+        });     
+
+        newSocket.on('searching', (data) => {
+            console.log("SEARCHING: ", data);
+            setIsSearching(data);
+        });
+
+        newSocket.on('searching_logo', (data) => {
+            console.log("SEARCHING LOGO: ", data);
+            setSearchingLogos(prev => [...prev, data.url]);
+        });
+
     
         setSocket(newSocket);
     
         return () => {
             newSocket.close();
         };
-    }, [agentId]);
+    }, []);
 
     useEffect(() => {
         if (messagesContainerRef.current) {
             messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
         }
     }, [messages, isWaiting]);
-
-    useEffect(() => {
-        // Load messages from localStorage
-        const savedMessages = localStorage.getItem(`messages-${agentId}`);
-        if (savedMessages) {
-            setMessages(JSON.parse(savedMessages));
-        }
-    }, [agentId]);
 
     const handleFileUpload = (event) => {
         const files = Array.from(event.target.files);
@@ -212,12 +123,11 @@ export const Agent = ({ agentId, selectedActions, behaviorText, onUpdateAgent })
                 text: inputMessage.trim(),
                 images: attachedImages,
                 type: 'user',
-                selectedActions: selectedActions,
-                behaviorText: behaviorText
+                selectedActions,
+                behaviorText
             };
 
-            setMessages(prevMessages => [...prevMessages, newMessage]);
-            localStorage.setItem(`messages-${agentId}`, JSON.stringify([...messages, newMessage]));
+            setMessages(prev => [...prev, newMessage]);
             setIsWaiting(true);
             
             socket.emit('user_message', newMessage);
@@ -230,8 +140,8 @@ export const Agent = ({ agentId, selectedActions, behaviorText, onUpdateAgent })
     const resetMessages = () => {
         socket.emit('reset');
         setMessages([]);
-        localStorage.setItem(`messages-${agentId}`, JSON.stringify([]));
         setIsWaiting(false);
+        setBrowsingURL(null);
     };
 
     const handleKeyPress = (e) => {
@@ -243,8 +153,87 @@ export const Agent = ({ agentId, selectedActions, behaviorText, onUpdateAgent })
 
     return (
         <div className='agent_container'>
+            <AnimatePresence>
+                {browsingURL && (
+                    isPopupMinimized ? (
+                        <motion.div
+                            className="browsing-tab"
+                            initial={{ y: -100 }}
+                            animate={{ y: 0 }}
+                            exit={{ y: -100 }}
+                            style={{
+                                position: "fixed",
+                                top: 0,
+                                right: "20px",
+                                background: "white",
+                                borderRadius: "0 0 8px 8px",
+                                boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                                padding: "8px 16px",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                                cursor: "pointer",
+                                zIndex: 1000,
+                            }}
+                            onClick={() => setIsPopupMinimized(false)}
+                        >
+                            <span>Browsing...</span>
+                            <FiMaximize2 />
+                        </motion.div>
+                    ) : (
+                        <motion.div
+                            className="browsing-popup"
+                            initial={{ scale: 0 }}
+                            animate={{
+                                scale: 1,
+                                x: popupPosition.x,
+                                y: popupPosition.y
+                            }}
+                            exit={{ scale: 0 }}
+                            drag
+                            dragMomentum={false}
+                            onDragEnd={(_, info) => {
+                                setPopupPosition({
+                                    x: popupPosition.x + info.offset.x,
+                                    y: popupPosition.y + info.offset.y
+                                });
+                            }}
+                            style={{
+                                aspectRatio: "16/9",
+                                width: "600px",
+                                position: "fixed",
+                                zIndex: 1000,
+                                background: "white",
+                                borderRadius: "8px",
+                                boxShadow: "0 4px 6px rgba(0,0,0,0.1)"
+                            }}
+                        >
+                            <div className="popup-header" style={{ padding: "8px", borderBottom: "1px solid #eee" }}>
+                                <button onClick={() => setIsPopupMinimized(true)}>
+                                    Minimize
+                                </button>
+                            </div>
+                            <div className="popup-content" style={{ height: "calc(100% - 40px)" }}>
+                                <iframe
+                                    src={browsingURL}
+                                    sandbox="allow-same-origin allow-scripts allow-forms"
+                                    allow="clipboard-read; clipboard-write"
+                                    style={{ pointerEvents: "none", width: "100%", height: "100%" }}
+                                />
+                            </div>
+                        </motion.div>
+                    )
+                )}
+            </AnimatePresence>
+
             <div className="chat_holder">
+
                 <div className="chat_header">
+
+                    <div className="logo">
+                        <img src="/logo.png" alt="logo" className="logo_image" />
+                    </div>
+
                     <div className="reset_button">
                         <FiRefreshCcw onClick={resetMessages} style={{ cursor: 'pointer' }} />
                     </div>
@@ -254,7 +243,9 @@ export const Agent = ({ agentId, selectedActions, behaviorText, onUpdateAgent })
                     {messages.map((message, index) => (
                         <div key={index} className={`chat_message ${message.type === 'agent' ? 'received' : 'sent'}`}>
                             <div className="message">
-                                {message.text?.trim().replace(/^['"]|['"]$/g, '')}
+                                <pre style={{whiteSpace: 'pre-wrap', fontFamily: 'inherit', margin: 0}}>
+                                    <Markdown>{message.text?.trim().replace(/^['"]|['"]$/g, '')}</Markdown>
+                                </pre>
                                 {message.images && message.images.length > 0 && (
                                     <div className="images_preview">
                                         {message.images.map((image, imgIndex) => (
@@ -268,9 +259,41 @@ export const Agent = ({ agentId, selectedActions, behaviorText, onUpdateAgent })
                         </div>
                     ))}
                     {isWaiting && (
-                        <div className="working-message">
-                            Working...
-                        </div>
+                        isSearching ? (
+                            <div className="searching_message_holder">
+                                {searchingLogos.length > 0 && (
+                                    <div className="searching_logos" style={{ marginRight: '0.5rem' }}>
+                                        {searchingLogos.map((logo, index) => (
+                                            <motion.img 
+                                                key={index} 
+                                                src={logo} 
+                                                alt="searching"
+                                                className="searching_logo"
+                                                initial={{ scale: 0, opacity: 0 }}
+                                                animate={{ scale: 1, opacity: 1 }}
+                                                transition={{ duration: 0.3, delay: index * 0.1 }}
+                                                style={{
+                                                    width: '24px',
+                                                    height: '24px',
+                                                    borderRadius: '50%',
+                                                    objectFit: 'cover',
+                                                    marginLeft: index !== 0 ? '-8px' : '0',
+                                                    border: '2px solid white',
+                                                    backgroundColor: 'white',
+                                                }}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                                <div className="working-message">
+                                    Searching...
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="working-message">
+                                Working...
+                            </div>
+                        )                        
                     )}
                 </div>
 
@@ -295,18 +318,10 @@ export const Agent = ({ agentId, selectedActions, behaviorText, onUpdateAgent })
                             onClick={() => fileInputRef.current.click()}
                             style={{ cursor: 'pointer', marginRight: '0.5rem' }}
                         />
-                        <FaIcons.FaMicrophone
-                            onClick={isRecording ? stopRecording : startRecording}
-                            style={{ 
-                                cursor: 'pointer', 
-                                marginRight: '0.5rem',
-                                color: isRecording ? 'red' : 'inherit'
-                            }}
-                        />
                         <input
                             type="text"
                             className="chat_input_field"
-                            placeholder="Message your agent..."
+                            placeholder="Talk to your assistant!"
                             value={inputMessage}
                             onChange={(e) => setInputMessage(e.target.value)}
                             onKeyPress={handleKeyPress}
@@ -324,5 +339,5 @@ export const Agent = ({ agentId, selectedActions, behaviorText, onUpdateAgent })
                 </div>
             </div>
         </div>
-    )
-}
+    );
+};

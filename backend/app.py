@@ -19,9 +19,30 @@ def _build_cors_preflight_response():
 
 def agent_reply_handler(message, client_sid):
     """Callback function to handle agent replies"""
-    print("AGENT REPLY HANDLER", message, client_sid)
     socketio.send({"message": message})
     print(f"Message emitted: {message}")
+
+def agent_reply_streaming_handler(message):
+    """Callback function to handle agent replies"""
+    socketio.emit('reply_stream', {"message": message})
+    print(f"Message emitted: {message}")
+
+def browser_view_handler(url):
+    """Callback function to send the url to view the browser being used"""
+    socketio.emit('browsing_url', {"url": url})
+    print(f"URL emitted: {url}")
+
+def searching_handler(urls):
+    """Callback function to tell the frontend that the agent is searching"""
+    print("SEARCHING EMITTED: True")
+    socketio.emit('searching', True)
+    print(f"Searching emitted: True")
+
+def searching_logo_handler(logo_url):
+    """Callback function to tell the frontend each logo url as it's searching for it"""
+    print("SEARCHING LOGO EMITTED: ", logo_url)
+    socketio.emit('searching_logo', {"url": logo_url})
+    print(f"Searching logo emitted: {logo_url}")
 
 @socketio.on('connect')
 def handle_connect():
@@ -63,5 +84,11 @@ if __name__ == "__main__":
     agent = Agent()
     print("Agent is ready. Starting Flask server...")
     agent.reply_callback = agent_reply_handler
+    agent.reply_streaming_callback = agent_reply_streaming_handler
+    agent.browser_view_callback = browser_view_handler
+    agent.searching_callback = searching_handler
+    agent.searching_logo_callback = searching_logo_handler
+
+    browser_view_handler("https://www.browserbase.com/devtools-fullscreen/inspector.html?wss=connect.browserbase.com/debug/9f24cc4a-fa58-45ed-bafe-ecac3c4fb531/devtools/page/D752AD67F0A5A4120FA24738BCA5C4F6?debug=true");
     print("Agent is ready. Starting SocketIO server...")
     socketio.run(app, port=7777)

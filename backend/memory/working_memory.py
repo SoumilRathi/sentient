@@ -24,6 +24,7 @@ class WorkingMemory:
             "datetime": datetime.datetime.now().isoformat()
         }
         self.observations = []  # History of observations and final outputs
+        self.current_actions = [] # Actions that are currently being executed
         self.actions = []  # History of actions taken
         self.knowledge = {}
         self.variables = {} # These are variables that apply to extremely user-specific values within the agent's context. 
@@ -31,6 +32,7 @@ class WorkingMemory:
         # if the agent is trying to find a restaurant, the variables could be the type of food, the price range, the location, etc.
         # if the agent is trying to send an email, the variables would be the email address.
         self.conversation_history = []
+        self.info_dump = ""
         
         # Start a background thread to update datetime every minute
         self.update_thread = threading.Thread(target=self._update_datetime, daemon=True)
@@ -45,13 +47,24 @@ class WorkingMemory:
         """Store an observation or final output"""
         self.observations.append(observation)
 
+    def store_current_action(self, action):
+        """Store a current action"""
+        self.current_actions.append(action)
+
+    def remove_current_action(self, action):
+        """Remove a current action"""
+        self.current_actions.remove(action)
+
     def store_action(self, action):
         """Store an action taken"""
         self.actions.append(action)
 
-    def store_conversation_history(self, conversation_history):
+    def store_conversation_history(self, role, message):
         """Store a conversation history"""
-        self.conversation_history.append(conversation_history)
+        self.conversation_history.append({
+            "role": role,
+            "message": message
+        })
 
     def retrieve_all(self):
         """Retrieve all contents of working memory"""
@@ -97,6 +110,8 @@ class WorkingMemory:
 
 
     def text_to_knowledge(self, text, query=None):
+
+        start_time = time.time()
         """Parses a bunch of text into knowledge segments and then adds it to memory"""
 
         prompt = f"""
@@ -157,12 +172,8 @@ class WorkingMemory:
         Ensure that your JSON is valid and that each segment contains every relevant piece of information from the original text, leaving nothing out. The segments should collectively capture all the main ideas mentioned in the original text, regardless of the topic.
         """
 
-        print("PROMPT: ",prompt)
-
 
         response = use_claude(prompt)
-
-        print("RESPONSE: ",response)
 
         # Extract the JSON content from the response
         json_start = response.find('{')
@@ -181,6 +192,9 @@ class WorkingMemory:
             }
             
             # Store the segment in memory
+
+            end_time = time.time()
+            print(f"Time to segment knowledge: {end_time - start_time}")
             self.store_knowledge(segment_obj)
 
 
@@ -233,103 +247,107 @@ class WorkingMemory:
                 related_variables.append(variable)
         return related_variables
 
+    def dump_info(self, info):
+        """Dump info"""
+        self.info_dump += info
 
-    def get_variables_from_input(self):
-        """This function will be called after each input, to extract important variables that the user may have provided. The variables are entirely dependent on the user, so it can be assumed that they can fully be extracted from the input"""
+    def remove_info(self, string):
+        """Remove info"""
+        self.info_dump = self.info_dump.replace(string, "")
+
+    # def get_variables_from_input(self):
+    #     """This function will be called after each input, to extract important variables that the user may have provided. The variables are entirely dependent on the user, so it can be assumed that they can fully be extracted from the input"""
         
-        all_input_text = ""
-        # Get last 10 conversation history entries
-        recent_history = self.conversation_history[-10:] if len(self.conversation_history) > 10 else self.conversation_history
+    #     all_input_text = ""
+    #     # Get last 10 conversation history entries
+    #     recent_history = self.conversation_history[-10:] if len(self.conversation_history) > 10 else self.conversation_history
         
-        # Build input text from conversation history
-        for entry in recent_history:
-            if entry["from"] == "user":
-                all_input_text += f"User: {entry['message']}\n"
-            else:
-                all_input_text += f"Agent: {entry['message']}\n"
+    #     # Build input text from conversation history
+    #     for entry in recent_history:
+    #         if entry["from"] == "user":
+    #             all_input_text += f"User: {entry['message']}\n"
+    #         else:
+    #             all_input_text += f"Agent: {entry['message']}\n"
 
-        # this way the all input text is effectively the entire history of the conversation
+    #     # this way the all input text is effectively the entire history of the conversation
 
-        prompt = f"""
+    #     prompt = f"""
 
-        You are an advanced AI assistant specializing in information extraction and organization. Your task is to analyze a given text, typically a conversation history, and identify distinct user-specific variables along with their values. These variables should relate to personal information that needs to be remembered for future interactions.
+    #     You are an advanced AI assistant specializing in information extraction and organization. Your task is to analyze a given text, typically a conversation history, and identify distinct user-specific variables along with their values. These variables should relate to personal information that needs to be remembered for future interactions.
 
-        Here is the text you need to analyze:
+    #     Here is the text you need to analyze:
 
-        <input_text>
-        {all_input_text}
-        </input_text>
+    #     <input_text>
+    #     {all_input_text}
+    #     </input_text>
 
-        Please follow these steps to complete the task:
+    #     Please follow these steps to complete the task:
 
-        1. Carefully read through the entire input text.
+    #     1. Carefully read through the entire input text.
 
-        2. Conduct an analysis of the text, focusing on identifying user-specific variables. Wrap your analysis inside <analysis> tags. In your analysis:
-        a. List all names mentioned in the text.
-        b. Identify potential variables related to the user's personal information.
-        c. For each potential variable, note its value, the surrounding context, and its frequency in the text.
-        d. Categorize each variable (e.g., personal information, preferences, numerical data).
-        e. Cross-reference identified variables with common personal information categories (e.g., name, age, location, occupation).
-        f. Evaluate the relevance and consistency of each variable to the user's personal information.
-        g. Perform a second pass to check for any missed variables, especially short names or nicknames.
-        h. Compile a final list of relevant user-specific variables and their values.
+    #     2. Conduct an analysis of the text, focusing on identifying user-specific variables. Wrap your analysis inside <analysis> tags. In your analysis:
+    #     a. List all names mentioned in the text.
+    #     b. Identify potential variables related to the user's personal information.
+    #     c. For each potential variable, note its value, the surrounding context, and its frequency in the text.
+    #     d. Categorize each variable (e.g., personal information, preferences, numerical data).
+    #     e. Cross-reference identified variables with common personal information categories (e.g., name, age, location, occupation).
+    #     f. Evaluate the relevance and consistency of each variable to the user's personal information.
+    #     g. Perform a second pass to check for any missed variables, especially short names or nicknames.
+    #     h. Compile a final list of relevant user-specific variables and their values.
 
-        3. Convert the final list into a JSON object, with variable names as keys and their values as values.
+    #     3. Convert the final list into a JSON object, with variable names as keys and their values as values.
 
-        4. Return the JSON object.
+    #     4. Return the JSON object.
 
-        Your analysis should follow this structure:
+    #     Your analysis should follow this structure:
 
-        <analysis>
-        Names mentioned in the text:
-        [List all names]
+    #     <analysis>
+    #     Names mentioned in the text:
+    #     [List all names]
 
-        1. Potential variable: [variable name]
-        Value: [corresponding value]
-        Category: [category of the variable]
-        Context: [surrounding text or reasoning for identification]
-        Frequency: [how often the variable appears in the text]
-        Relevance: [explanation of why this is relevant user-specific information]
-        Consistency: [note if the value is consistent throughout the text]
+    #     1. Potential variable: [variable name]
+    #     Value: [corresponding value]
+    #     Category: [category of the variable]
+    #     Context: [surrounding text or reasoning for identification]
+    #     Frequency: [how often the variable appears in the text]
+    #     Relevance: [explanation of why this is relevant user-specific information]
+    #     Consistency: [note if the value is consistent throughout the text]
 
-        2. Potential variable: [another variable name]
-        Value: [corresponding value]
-        Category: [category of the variable]
-        Context: [surrounding text or reasoning for identification]
-        Frequency: [how often the variable appears in the text]
-        Relevance: [explanation of why this is relevant user-specific information]
-        Consistency: [note if the value is consistent throughout the text]
+    #     2. Potential variable: [another variable name]
+    #     Value: [corresponding value]
+    #     Category: [category of the variable]
+    #     Context: [surrounding text or reasoning for identification]
+    #     Frequency: [how often the variable appears in the text]
+    #     Relevance: [explanation of why this is relevant user-specific information]
+    #     Consistency: [note if the value is consistent throughout the text]
 
-        [Continue for all identified variables]
+    #     [Continue for all identified variables]
 
-        Cross-reference with common personal information categories:
-        [List how identified variables match with common categories]
+    #     Cross-reference with common personal information categories:
+    #     [List how identified variables match with common categories]
 
-        Second pass for missed variables:
-        [List any additional variables found, following the same structure]
+    #     Second pass for missed variables:
+    #     [List any additional variables found, following the same structure]
 
-        Final list of relevant user-specific variables and values:
-        - [variable1]: [value1]
-        - [variable2]: [value2]
-        [etc.]
-        </analysis>
+    #     Final list of relevant user-specific variables and values:
+    #     - [variable1]: [value1]
+    #     - [variable2]: [value2]
+    #     [etc.]
+    #     </analysis>
 
-        After completing your analysis, provide the final output in the following JSON format:
+    #     After completing your analysis, provide the final output in the following JSON format:
 
-        {{
-        "variable1": "value1",
-        "variable2": "value2",
-        ...
-        }}
+    #     {{
+    #     "variable1": "value1",
+    #     "variable2": "value2",
+    #     ...
+    #     }}
 
-        Remember, only include variables that are specifically related to the user's personal information and are important for future interactions. Do not include random or irrelevant variables.
-        """
+    #     Remember, only include variables that are specifically related to the user's personal information and are important for future interactions. Do not include random or irrelevant variables.
+    #     """
 
-        print("PROMPT: ",prompt)
+    #     response = use_claude(prompt)
 
-        response = use_claude(prompt)
-
-        print("RESPONSE: ",response)
 
 
     def reason(self, query):
@@ -405,6 +423,12 @@ class WorkingMemory:
         ## Observations
         {self.observations if self.observations else "No observations recorded yet."}
         
+        ## Conversation History
+        {"\n".join([f"{msg['role'].capitalize()}: {msg['message']}" for msg in self.conversation_history]) if self.conversation_history else "No conversation history yet."}
+
+        ## Info Dump
+        {self.info_dump if self.info_dump else "No additional info dump"}
+
         ## Actions Taken
         {self.actions if self.actions else "No actions taken yet."}
         
