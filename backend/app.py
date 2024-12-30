@@ -88,7 +88,5 @@ if __name__ == "__main__":
     agent.browser_view_callback = browser_view_handler
     agent.searching_callback = searching_handler
     agent.searching_logo_callback = searching_logo_handler
-
-    browser_view_handler("https://www.browserbase.com/devtools-fullscreen/inspector.html?wss=connect.browserbase.com/debug/9f24cc4a-fa58-45ed-bafe-ecac3c4fb531/devtools/page/D752AD67F0A5A4120FA24738BCA5C4F6?debug=true");
     print("Agent is ready. Starting SocketIO server...")
     socketio.run(app, port=7777)

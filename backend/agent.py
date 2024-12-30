@@ -40,6 +40,7 @@ class Agent:
         self.decision_loop_running = False
         self.decision_thread = None
         self.selected_actions = ["reply", "email", "search"]
+        self.pending_decision = False
         self.behavior = ""
         self.reminders: Dict[datetime, List[dict]] = {}
 
@@ -99,49 +100,69 @@ class Agent:
 
         # Construct the user prompt with proposed actions and memory context
         prompt = f"""
-        You are an intelligent agent designed to propose actions based on your current working memory and a set of available actions. Your goal is to quickly and efficiently select the most appropriate actions for the given situation.
+        You are an intelligent agent designed to propose actions based on your current working memory and a set of available actions. Your primary goal is to quickly and efficiently select the most appropriate actions for any given situation.
 
         Here is your current working memory:
         <working_memory>
         {self.working_memory.print()}
         </working_memory>
 
+        Your task is to propose and use the ideal action that you could potentially take at this step. Follow these steps:
+        1. Do not generate new knowledge or information. Rely solely on the information provided in your working memory. You will have information both in the form of info dumps and in the form of knowledge segments.
+        2. When using variables, check if they're available in your working memory. If not, determine the best way to obtain the needed information (e.g., asking the user, web search).
+        3. For tasks with specific times or reminders, set a reminder instead of acting immediately.
+        4. Ignore reminders from previous actions in your working memory. Only act on reminders prefixed with "REMINDER:" in your observations.
+        5. Before acting on a reminder, verify that the corresponding action hasn't already been taken.
+        6. Use the browse action for online service tasks requested by the user.
+        7. Utilize existing knowledge in your working memory before performing a web search.
+        8. After providing the user's desired output, use the wait action to pause for additional input.
+        9. Perform only one web search at a time. Make use of existing search results before initiating a new search.
+        10. Prioritize obtaining personal information from the user when necessary for task completion.
+        11. Avoid repeating queries to the user. Wait for a response if information has been requested.
+        13. IMPORTANT: Do not use placeholders for tools requiring specific inputs like email addresses; ask the user for the actual information first instead.
+        14. IMPORTANT: If you have information / knowledge in your working memory already, do not use search again. 
+        15. IMPORTANT: If you have already replied to the user, do not reply again with the same message. Wait for the user. Don't repeat the same reply multiple times.
+        16. IMPORTANT: You can view the previous actions in your working memory. Don't repeat the same action multiple times. If you have made an action before, DO NOT meaninnglessly repeat it.
+        17. IMPORTANT: If you have already sent the user an email about something, you do not need to send another one. Instead, you can reply to them informing them that the email has been sent.
 
-        Your task is to propose and use the ideal action that you could potentially take at this step. Consider the relevance, priority, and potential outcomes of each action given the current context, and propose the best action.
+        Before proposing an action, wrap your reasoning process inside <action_analysis> tags:
 
-        Directly use the best tools based on the various instructions you have been given.
+        1. Identify the current task or query from the working memory.
+        2. List all possible actions that could be taken.
+        3. Check for any reminders or time-sensitive tasks in the working memory.
+        4. For each possible action:
+            a. Evaluate it against the given constraints and instructions.
+            b. Consider its relevance and priority in the current context.
+            c. Analyze potential short-term and long-term outcomes.
+            d. If the action requires information from the user, check if you have already asked for it. If so, do not ask again. If not, reply and ask the information first. 
+        5. Determine the most appropriate action based on your evaluation.
+        6. Double-check that the chosen action adheres to all constraints, especially tool usage and instruction following.
+        7. Consider any potential consequences or follow-up actions that may be needed.
+        8. IMPORTANT: Ensure that the agent does not require you to enter any placeholders for specific inputs. If it does, use reply to get the information instead.
+        9. IMPORTANT: Ensure that the action is not a repeat of a previous action. If it is, do not propose it, do something else. 
 
-        Important constraints and instructions:
+        After your reasoning, provide a brief summary of your proposed action and then execute it using the appropriate tool. Your response should be concise and action-oriented.
 
-        1. Do not generate new knowledge or information on your own. You are prone to hallucinations and must not make any assumptions.
-        2. Use only the provided actions to acquire new knowledge.
-        3. Consider how to provide the best eventual output based on the given input.
-        4. Choose actions that will help you reach that output.
-        5. When you have to enter or use explicit variables, identify if you have the required variable in your working memory. If you do, use it. If not, identify the best way to get the value you need. This could be asking the user, searching the web, or more. Determine this based on the variable at hand.
-        6. If there is any task that has a reminder or a specific time associated with it, don't conduct the action now. Instead, set a reminder for the specified time, which will be added to your working memory when the reminder is triggered.
-        7. Please note that if you notice a reminder for a task within your previous actions within your working memory, you should ignore that, since that's a reminder for the future. Any reminders that you actually have to act on will be present within your observations with the prefix "REMINDER:"
-        8. If acting on a reminder within your observations, please first check if an action corresponding to that reminder has already been taken. If so, that reminder is no longer relevant and can be ignored.
-        9. If you will need any additional information from the user during the course of this task, prioritize asking the user for that information over any other action, so that the user can provide the information immediately and you can continue with the task. In this scenario, no matter what, this action will be the highest priority.
-        10. If the user asks you to conduct actions on their behalf on online services, you can use the browse action to do so.
-        11. If you have relevant knowledge within your working memory already, you don't need to search the web again for it.
-        12. You may have knowledge either in the form of your knowledge in the working memory or in the form of an info dump. Both are valid.
-        13. Do not search the web multiple times in a row. This is a waste of resources. Instead, try to make do with a single search, and if you need to refine more, just reply to the user and take it from there. This means that you should try to make do with the search results that you already have.
+        Example output structure:
 
-        When evaluating an action, consider the following:
-        1. How does it relate to the information in your working memory?
-        2. What are the potential outcomes of this action?
-        3. How relevant and priority is this action given the current context?
-            - Which actions are most likely to lead to a productive outcome?
-            - Are there any actions that might be redundant or less useful given the current context?
-        4. Is there any action that requires other actions to be completed first? If so, give higher priority to the actions to be completed first.
-        5. Is there any additional information you need from the user to complete the task? If so, prioritize this action over all others.
+        <action_analysis>
+        [Your step-by-step reasoning process]
+        </action_analysis>
 
-        Use the tool directly to solve the issue. 
+        Proposed Action: [Brief description of the chosen action]
+
+        [Execute the action using the appropriate tool]
+
+        Remember to prioritize quick and efficient responses while strictly adhering to the given instructions and constraints.
         """
 
         tools = get_available_tools(self.selected_actions)
 
+        print("Checkpoint 2")
+
         response = use_claude_tools(prompt, images=self.images, tools=tools)
+
+        print("Checkpoint 3")
 
         print("RESPONSE: ", response)
         # response = use_claude_tools(prompt, images=self.images, tools=tools, stream=True)
@@ -153,6 +174,7 @@ class Agent:
         """Executes the selected action"""
         isFinal = False
 
+        isDecisionNeeded = False
         # full_response = ""
 
         # full_reply_string = ""
@@ -188,6 +210,8 @@ class Agent:
 
         # get the first word of the action
         action_name = action["tool"]
+        
+        action_to_store = action
 
         print("ACTION NAME: ", action_name)
 
@@ -199,6 +223,10 @@ class Agent:
                 isFinal = True
             if self.reply_callback:
                 self.reply_callback(reply_message, self.client_sid)
+
+            action_to_store = "Reply successfully sent to user: " + reply_message
+
+            print("WORKING MEMORY BEFORE TAKING THE ACTION: ", self.working_memory.print())
             
             self.working_memory.store_conversation_history("assistant", reply_message)
 
@@ -218,16 +246,19 @@ class Agent:
             # threading.Thread(target=search_and_complete, args=(query,)).start()
             # isAsync = True
 
+            action_to_store = "Searched for: " + query
+
             self.web_search(query)
         
         elif action_name == "email":
-            print(f"Sending email: {action[7:]}")
             # Extract email, subject and body from the action string
             email_address = action["input"]["email_address"]
             subject = action["input"]["subject"]
             body = action["input"]["body"]
+
+            action_to_store = "Email sent to " + email_address + " with subject " + subject;
             send_email(email_address, subject, body)
-            print(f"Sending email to: {email_address}")
+            print(f"Email successfully sent to: {email_address}")
             print(f"Subject: {subject}")
             print(f"Body: {body}")
         
@@ -269,11 +300,11 @@ class Agent:
         elif action_name == "remind":
             # Extract time and task from the remind action
             # Format: remind <TIME> "<TASK>"
-            parts = action["input"]["remind"].split(' "', 1)
-            if len(parts) == 2:
-                time_str = parts[0].strip()
-                task = parts[1].strip('"')
-                self.set_reminder(time_str, task)
+            time = action["input"]["time"]
+            message = action["input"]["message"]
+            single_shot = action["input"]["single_shot"]
+            action_to_store = "Reminder successfully set for: " + time + " with message: " + message;
+            self.set_reminder(time, message, single_shot)
 
         elif action_name == "code":
             task = action["input"]["code"]
@@ -282,20 +313,23 @@ class Agent:
             self.working_memory.store_observation("Task to write code: " + task + "\n" + "Result: " + result)
 
         elif action_name == "wait":
-            isFinal = True
-            isAsync = True
+            if not self.pending_decision:
+                isFinal = True
+                isAsync = True
+            action_to_store = "Waiting for user input"
 
         print(f"Executing action: {action}")
 
-        if not isAsync:
-            self.working_memory.store_action(action)
+        self.working_memory.store_action(action_to_store)
 
         return isFinal
     
     def make_decision(self):
         """Main decision-making loop"""
+        print("Checkpoint 1: Starting decision loop")
         self.decision_loop_running = True
         while self.decision_loop_running:
+            self.pending_decision = False
             action = self.propose_actions()
             is_final = self.execute_action(action)
             
@@ -318,8 +352,14 @@ class Agent:
             self.images = images
         self.client_sid = client_sid
         if not self.decision_loop_running:
+            print("Starting decision loop")
             self.decision_thread = threading.Thread(target=self.make_decision)
+            print("thread created")
             self.decision_thread.start()
+            print("thread started")
+        else: 
+            self.pending_decision = True
+            print("Decision loop is already running")
 
     def learn(self):
         """Learn from the current working memory"""
@@ -352,17 +392,20 @@ class Agent:
             # Create a copy of reminder times to avoid modification during iteration
             reminder_times = list(self.reminders.keys())
             
-            # Check for due reminders
-            for reminder_time in reminder_times:
-                print("REMINDER TIME: ", reminder_time)
-                if current_time >= reminder_time:
-                    reminders_to_process.extend(self.reminders[reminder_time])
-                    del self.reminders[reminder_time]
+            # # Check for due reminders
+            # for reminder_time in reminder_times:
+            #     print("REMINDER TIME: ", reminder_time)
+            #     if current_time >= reminder_time:
+            #         reminders_to_process.extend(self.reminders[reminder_time])
+            #         del self.reminders[reminder_time]
             
-            # Process due reminders
-            for reminder in reminders_to_process:
-                print("PROCESSING REMINDER: ", reminder)
-                self.process_reminder(reminder)
+            # # Process due reminders
+            # for reminder in reminders_to_process:
+            #     print("PROCESSING REMINDER: ", reminder)
+            #     self.process_reminder(reminder)
+
+
+            # TODO: Add a check for reminders that are due
             
             # Sleep for a short interval before next check
             time.sleep(60)  # Check every minute
@@ -376,12 +419,12 @@ class Agent:
             self.decision_thread = threading.Thread(target=self.make_decision)
             self.decision_thread.start()
     
-    def set_reminder(self, time_str: str, message: str):
+    def set_reminder(self, time, message, single_shot):
         """Set a reminder for a specific time"""
 
-        print("Sets a reminder for: ", time_str)
+        print("Sets a reminder for: ", time, message, single_shot   )
         try:
-            reminder_time = datetime.fromisoformat(time_str)
+            reminder_time = datetime.fromisoformat(time)
             if reminder_time not in self.reminders:
                 self.reminders[reminder_time] = []
             
@@ -394,7 +437,7 @@ class Agent:
             print("Reminders now: ", self.reminders)
             return True
         except ValueError:
-            print(f"Invalid datetime format: {time_str}")
+            print(f"Invalid datetime format: {time}")
             return False
 
         

@@ -3,6 +3,8 @@ import anthropic
 import os
 from postmarker.core import PostmarkClient
 from dotenv import load_dotenv
+from openai import OpenAI
+
 load_dotenv()
 
 
@@ -15,7 +17,7 @@ all_tools = [
             "properties": {
                 "message": {
                     "type": "string",
-                    "description": "The message to reply with. Please note that the reply message should be in **markdown** format. If you want to give control of the conversation back to the user (basically if you want to wait to continue the task until the user sends another message), just add the tag <wait> to the end of your reply "
+                    "description": "The message to reply with. Please note that the reply message should be in **markdown** format."
                 }
             },
             "required": ["message"]
@@ -65,7 +67,7 @@ all_tools = [
                 },
                 "body": {
                     "type": "string",
-                    "description": "The body of the email, in html format"
+                    "description": "The body of the email, in html format. Start with <html> and end with </html>"
                 }
             },
             "required": ["email_address", "subject", "body"]
@@ -85,11 +87,28 @@ all_tools = [
             "required": ["reason"]
         }
     },
-    # {
-    #     "name": "code",
-    #     "description": "Write python code to run and execute, and to view the output of the code. This action is meant to be used whenever you need to write and execute python code, whether that is because you need to view an output/result from the code, or because you need to write code to complete the task. You don't need to write the code yourself, just describe what you want to do, and the code will be written by another agent.",
-    #     "action": "code <INTENTION>"
-    # }
+    {
+        "name": "remind",
+        "description": "Set a reminder for a specific time with a specific message. This will be used if you need to schedule tasks for yourself to do for the user at a later time",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "time": {
+                    "type": "string", 
+                    "description": "The time to set the reminder for in ISO format"
+                },
+                "message": {
+                    "type": "string", 
+                    "description": "The message to set the reminder for. This is the task that you will be reminded to do"
+                },
+                "single_shot": {
+                    "type": "boolean", 
+                    "description": "Whether this is a single shot reminder or a recurring reminder. If it is a recurring reminder, you will be reminded every day at the same time"
+                }
+            },
+            "required": ["time", "message", "type"]
+        }
+    },
 ]
 
 
@@ -191,10 +210,24 @@ def use_claude(user_prompt, system_prompt=None, temperature=1, json=False, tools
 
     return message.content[0].text
 
+ds_client = OpenAI(api_key=os.getenv("DEEPSEEK_API_KEY"), base_url="https://api.deepseek.com")
+def use_deepseek(prompt):
+    
+    response = ds_client.chat.completions.create(
+        model="deepseek-chat",
+        messages=[
+            {"role": "user", "content": prompt},
+        ],
+        stream=False
+    )
+
+    return response.choices[0].message.content
+
 
 def use_claude_tools(user_prompt, system_prompt=None, temperature=1, json=False, tools=[], images=[], stream=False):
     message_params = {
-        "model": "claude-3-5-haiku-20241022",
+        # "model": "claude-3-5-haiku-20241022",
+        "model": "claude-3-5-sonnet-20240620",
         "max_tokens": 1024,
         "temperature": temperature,
         "messages": [
@@ -204,7 +237,6 @@ def use_claude_tools(user_prompt, system_prompt=None, temperature=1, json=False,
             }
         ],
         "tools": tools,
-        "tool_choice": {"type": "any"}
     }
     
     if system_prompt is not None:
@@ -221,12 +253,19 @@ def use_claude_tools(user_prompt, system_prompt=None, temperature=1, json=False,
     content.append({"type": "text", "text": user_prompt})
     message_params["messages"][0]["content"] = content
 
+
     message = client.messages.create(**message_params)
 
-    response = {
-        "tool": message.content[0].name,
-        "input": message.content[0].input,
-    }
+    print("MESSAGE: ", message, "with prompt: ", user_prompt)
+
+    for content_block in message.content:
+        if content_block.type == "tool_use":
+            response = {
+                "tool": content_block.name,
+                "input": content_block.input,
+            }
+
+    print("RESPONSE: ", response)
 
     return response
 
@@ -292,19 +331,4 @@ def send_email(email_address, subject, body):
 
 
 if __name__ == "__main__":
-    print("hello");
-    for message in use_claude_tools("What is the weather in San Francisco?", tools=[ {
-        "name": "reply",
-        "description": "Talk to the user / reply to the input. Note that replying to the user is final, and the decision loop will end after this action is selected. This means that you should only select it once you have finished the task, or when you need more user input to continue the task. Please note that the reply message should be in **markdown** format. If you want to give control of the conversation back to the user (basically if you want to wait to continue the task until the user sends another message), just add the tag <wait> to the end of your reply",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "message": {
-                    "type": "string",
-                    "description": "The message to reply with"
-                }
-            },
-            "required": ["message"]
-        }
-    }], stream=True):
-        print("MESSAGE: ", message)
+    print(use_deepseek("What is the weather in San Francisco?"))

@@ -42,6 +42,7 @@ def search(query, searching_logo_callback):
             
         print("URLS: ", urls)
         
+        # Start of Selection
         # Create list to store threads
         threads = []
         # Dictionary to store results from each thread
@@ -50,8 +51,13 @@ def search(query, searching_logo_callback):
         def fetch_url(url):
             try:
                 page = fetcher.get(url)
-                # Extract all text from the page using get_all_text()
-                text = page.get_all_text(ignore_tags=('script', 'style'))
+                # Extract main content from the page using a specific selector
+                main_content = page.css_first('main')  # Adjust the selector based on the website's structure
+                if main_content:
+                    text = main_content.get_all_text(ignore_tags=('script', 'style'))
+                else:
+                    # Fallback to extracting all text if main content is not found
+                    text = page.get_all_text(ignore_tags=('script', 'style'))
                 results[url] = text
             except Exception as e:
                 print(f"Error fetching {url}: {str(e)}")

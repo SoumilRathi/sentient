@@ -22,6 +22,8 @@ export const Agent = ({ selectedActions, behaviorText }) => {
     const [isSearching, setIsSearching] = useState(false);
     const [searchingLogos, setSearchingLogos] = useState([]);
 
+    const inputRef = useRef(null);
+
     useEffect(() => {
         const newSocket = io('http://localhost:7777');
     
@@ -92,6 +94,18 @@ export const Agent = ({ selectedActions, behaviorText }) => {
         }
     }, [messages, isWaiting]);
 
+    useEffect(() => {
+        const handleKeyPress = (e) => {
+            if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
+                e.preventDefault();
+                inputRef.current?.focus();
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyPress);
+        return () => document.removeEventListener('keydown', handleKeyPress);
+    }, []);
+
     const handleFileUpload = (event) => {
         const files = Array.from(event.target.files);
         const allowedTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
@@ -133,6 +147,8 @@ export const Agent = ({ selectedActions, behaviorText }) => {
             socket.emit('user_message', newMessage);
 
             setInputMessage("");
+            setIsSearching(false);
+            setSearchingLogos([]);
             setAttachedImages([]);
         }
     };
@@ -320,6 +336,7 @@ export const Agent = ({ selectedActions, behaviorText }) => {
                         />
                         <input
                             type="text"
+                            ref={inputRef}
                             className="chat_input_field"
                             placeholder="Talk to your assistant!"
                             value={inputMessage}

@@ -16,7 +16,7 @@ h1, h2, h3, h4, h5, h6 {
 :root {
     overflow: overlay;
     --text: #110615;
-    --background: rgb(249, 247, 242);
+    --background: #f9f7f2;
     --bg: rgb(249, 247, 242);
     --primary: #9755ab;
     --secondary: #c899d6;
