@@ -1,5 +1,7 @@
 # Sentient (WIP)
 
+This repository is no longer maintained. All updates to this project are made on private repos. 
+
 ## Description
 
 Sentient is a cognitive personal assistant. It has a backend architecture based on a new agentic framework, and a chat interface that allows users to seamlessly interact with it. 
